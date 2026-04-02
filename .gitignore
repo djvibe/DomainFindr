@@ -1,3 +1,8 @@
 .codex
 domainFindr
+
+# Private local docs kept alongside tracked docs.
+docs/private/
+
+# Local-only workspace for private inputs, outputs, and notes.
 workspace/
