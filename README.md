@@ -44,9 +44,9 @@ domainFindr openai.com example.com
 ### Batch from file
 
 ```bash
-domainFindr --input domains.md
-domainFindr --input domains.csv --format json
-domainFindr --input domains.csv --format csv --output results.csv
+domainFindr --input docs/example-domains.md
+domainFindr --input workspace/batches/in/april-batch.csv --format json
+domainFindr --input workspace/batches/in/april-batch.csv --format csv --output results.csv
 ```
 
 ### History and logs
@@ -92,7 +92,7 @@ domainFindr --input ~/Downloads/domains.md --log-file ~/domainfindr.log --no-his
 - `internal/lookup/`: RDAP client
 - `internal/runner/`: concurrency, retries, rate limiting
 - `internal/output/`: table, JSON, CSV formatting
-- `docs/`: research and planning notes
+- `docs/features/`: tracked feature planning and completed launch docs
 - `docs/features/planned/`: planned feature or launch docs tracked in Git
 - `docs/features/done/`: completed feature or launch docs tracked in Git
 - `workspace/`: local-only batch input/output area, ignored by Git
@@ -102,6 +102,12 @@ domainFindr --input ~/Downloads/domains.md --log-file ~/domainfindr.log --no-his
 Use `workspace/` for local batch processing and `docs/features/` for tracked feature planning and completed launch docs.
 
 ### Batch searches
+
+Create the local batch folders if they do not exist yet:
+
+```bash
+mkdir -p workspace/batches/in workspace/batches/done
+```
 
 Drop incoming Markdown or CSV files into:
 
@@ -141,7 +147,7 @@ docs/features/done/
 ```bash
 go test ./...
 gofmt -w cmd internal
-go build ./cmd/domainfindr
+go build -o domainFindr ./cmd/domainfindr
 ```
 
 If Go cannot write to its default cache in a restricted environment:

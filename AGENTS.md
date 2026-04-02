@@ -11,7 +11,8 @@ This repository contains a Go CLI for domain availability checks.
 - `internal/runner/`: worker pool, retry logic, and rate limiting.
 - `internal/output/`: table, CSV, and JSON formatting.
 - `internal/model/`: shared result and input types.
-- `docs/`: research and planning notes.
+- `docs/features/`: tracked feature planning and completed launch docs.
+- `workspace/`: local-only batch input/output area. This path is Git-ignored.
 
 Keep new production code under `internal/` unless it is the binary entrypoint.
 
@@ -48,7 +49,7 @@ Tests use Go’s built-in `testing` package and live next to the code as `*_test
 
 ## Commit & Pull Request Guidelines
 
-There is no established Git history in this workspace yet, so use simple, imperative commit messages such as:
+Use simple, imperative commit messages such as:
 `Add positional domain arguments to CLI`
 
 For pull requests:
