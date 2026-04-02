@@ -49,10 +49,16 @@ func parseMarkdown(r io.Reader) ([]model.Entry, error) {
 	scanner := bufio.NewScanner(r)
 	seen := map[string]struct{}{}
 	var entries []model.Entry
+	inCodeFence := false
 
 	for scanner.Scan() {
 		line := strings.TrimSpace(scanner.Text())
 		if line == "" {
+			continue
+		}
+
+		if isCodeFence(line) {
+			inCodeFence = !inCodeFence
 			continue
 		}
 
@@ -66,13 +72,24 @@ func parseMarkdown(r io.Reader) ([]model.Entry, error) {
 				continue
 			}
 			for _, cell := range cells {
-				addCandidate(&entries, seen, cell)
+				if looksLikeStandaloneDomainCandidate(cell) {
+					addCandidate(&entries, seen, cell)
+				}
 			}
 			continue
 		}
 
-		line = bulletPrefix.ReplaceAllString(line, "")
-		addCandidate(&entries, seen, line)
+		stripped := bulletPrefix.ReplaceAllString(line, "")
+		if stripped != line {
+			if looksLikeStandaloneDomainCandidate(stripped) {
+				addCandidate(&entries, seen, stripped)
+			}
+			continue
+		}
+
+		if looksLikeStandaloneDomainCandidate(line) {
+			addCandidate(&entries, seen, stripped)
+		}
 	}
 
 	if err := scanner.Err(); err != nil {
@@ -161,6 +178,10 @@ func isMarkdownSeparator(line string) bool {
 	return strings.TrimSpace(trimmed) == ""
 }
 
+func isCodeFence(line string) bool {
+	return strings.HasPrefix(line, "```") || strings.HasPrefix(line, "~~~")
+}
+
 func splitMarkdownCells(line string) []string {
 	parts := markdownSplit.Split(strings.Trim(line, "|"), -1)
 	out := make([]string, 0, len(parts))
@@ -185,6 +206,16 @@ func looksLikeMarkdownHeader(cells []string) bool {
 	}
 
 	return true
+}
+
+func looksLikeStandaloneDomainCandidate(value string) bool {
+	trimmed := strings.TrimSpace(value)
+	if trimmed == "" {
+		return false
+	}
+
+	trimmed = strings.Trim(trimmed, "`'\"[](){}<>|")
+	return strings.Contains(trimmed, ".") && !strings.ContainsAny(trimmed, " \t")
 }
 
 func firstLine(value string) string {

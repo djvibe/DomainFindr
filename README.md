@@ -49,6 +49,13 @@ domainFindr --input workspace/batches/in/april-batch.csv --format json
 domainFindr --input workspace/batches/in/april-batch.csv --format csv --output results.csv
 ```
 
+Supported batch input patterns:
+
+- Markdown bullet lists such as `- example.com`
+- Markdown tables with a `domain` column
+- Plain domain lines inside fenced code blocks
+- CSV files with a `domain` header or domains in the first column
+
 ### History and logs
 
 By default, each run saves a timestamped history folder under:
@@ -114,6 +121,27 @@ Drop incoming Markdown or CSV files into:
 ```bash
 workspace/batches/in/
 ```
+
+Recommended import formats:
+
+~~~md
+# Batch Name
+
+```text
+example.com
+anotherexample.com
+```
+~~~
+
+or:
+
+```csv
+domain
+example.com
+anotherexample.com
+```
+
+Avoid prose mixed directly with raw domain lines outside bullets, tables, or fenced code blocks.
 
 After running them and saving the outputs you want to keep, move the source file into:
 
