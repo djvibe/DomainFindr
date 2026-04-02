@@ -9,6 +9,7 @@ DomainFindr is a Go CLI for checking whether domains are registered or available
 - Output formats: table, JSON, and CSV
 - RDAP-based availability checks
 - Worker pool with retries, timeouts, and global request pacing
+- Automatic per-run history with saved results and logs
 
 ## Install
 
@@ -48,6 +49,27 @@ domainFindr --input domains.csv --format json
 domainFindr --input domains.csv --format csv --output results.csv
 ```
 
+### History and logs
+
+By default, each run saves a timestamped history folder under:
+
+```bash
+~/.local/state/domainfindr/history/
+```
+
+Each run directory contains:
+
+- `results.txt`, `results.json`, or `results.csv`
+- `domainfindr.log`
+
+Examples:
+
+```bash
+domainFindr openai.com
+domainFindr --input ~/Downloads/domains.csv --history-dir ~/domainfindr-history
+domainFindr --input ~/Downloads/domains.md --log-file ~/domainfindr.log --no-history
+```
+
 ### Common flags
 
 - `--input`, `-i`: Markdown or CSV input file
@@ -58,6 +80,9 @@ domainFindr --input domains.csv --format csv --output results.csv
 - `--retry`: retry count for transient failures
 - `--timeout`: timeout per lookup attempt
 - `--verbose`, `-v`: verbose progress logging to stderr
+- `--log-file`: write logs to a specific file
+- `--history-dir`: override the default history root directory
+- `--no-history`: disable automatic history saving
 
 ## Project Layout
 
