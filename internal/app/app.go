@@ -87,6 +87,7 @@ func Run(ctx context.Context, args []string, stdout io.Writer, stderr io.Writer)
 	results := run.Run(ctx, entries)
 
 	writer := stdout
+	summaryWriter := stderr
 	if cfg.Output != "" {
 		file, err := os.Create(cfg.Output)
 		if err != nil {
@@ -97,6 +98,9 @@ func Run(ctx context.Context, args []string, stdout io.Writer, stderr io.Writer)
 		writer = file
 	} else if history.outputFile != nil {
 		writer = io.MultiWriter(stdout, history.outputFile)
+		summaryWriter = stdout
+	} else {
+		summaryWriter = stdout
 	}
 
 	if err := output.WriteResults(writer, cfg.Format, results); err != nil {
@@ -104,9 +108,9 @@ func Run(ctx context.Context, args []string, stdout io.Writer, stderr io.Writer)
 		return 1
 	}
 
-	printSummary(stderr, results)
+	printSummary(summaryWriter, results)
 	if history.dir != "" {
-		fmt.Fprintf(stderr, "History saved in %s\n", history.dir)
+		fmt.Fprintf(summaryWriter, "History saved in %s\n", history.dir)
 	}
 	return 0
 }

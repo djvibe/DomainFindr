@@ -93,6 +93,48 @@ domainFindr --input ~/Downloads/domains.md --log-file ~/domainfindr.log --no-his
 - `internal/runner/`: concurrency, retries, rate limiting
 - `internal/output/`: table, JSON, CSV formatting
 - `docs/`: research and planning notes
+- `docs/features/planned/`: planned feature or launch docs tracked in Git
+- `docs/features/done/`: completed feature or launch docs tracked in Git
+- `workspace/`: local-only batch input/output area, ignored by Git
+
+## Suggested Workflow
+
+Use `workspace/` for local batch processing and `docs/features/` for tracked feature planning and completed launch docs.
+
+### Batch searches
+
+Drop incoming Markdown or CSV files into:
+
+```bash
+workspace/batches/in/
+```
+
+After running them and saving the outputs you want to keep, move the source file into:
+
+```bash
+workspace/batches/done/
+```
+
+Example:
+
+```bash
+domainFindr --input workspace/batches/in/april-batch.csv --format csv
+mv workspace/batches/in/april-batch.csv workspace/batches/done/
+```
+
+### Feature planning
+
+Keep domains you are still considering in:
+
+```bash
+docs/features/planned/
+```
+
+Move finalized or completed sets into:
+
+```bash
+docs/features/done/
+```
 
 ## Development
 
