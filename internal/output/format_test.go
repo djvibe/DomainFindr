@@ -31,10 +31,10 @@ func TestWriteResultsCSV(t *testing.T) {
 	}
 
 	output := buf.String()
-	if !strings.Contains(output, "domain,available,status,source,registry_status,registrar_status,pricing_class,price,currency,registration_period,verification_provider,error") {
+	if !strings.Contains(output, "domain,available,status,source,registry_status,registrar_status,registrar_consensus,pricing_class,price,currency,registration_period,verification_provider,verification_environment,error") {
 		t.Fatalf("unexpected csv output: %s", output)
 	}
-	if !strings.Contains(output, "example.com,false,registered,rdap,registered,,,,,,RDAP,,registered") {
+	if !strings.Contains(output, "example.com,false,registered,rdap,registered,,,,,,,RDAP,,") {
 		t.Fatalf("unexpected csv row: %s", output)
 	}
 }
@@ -50,14 +50,16 @@ func TestWriteResultsJSON(t *testing.T) {
 			Source:               model.SourceHTTP,
 			RegistryStatus:       model.StatusAvailable,
 			RegistrarStatus:      model.StatusStandardAvailable,
+			RegistrarConsensus:   model.ConsensusIncomplete,
 			PricingClass:         "standard",
 			Price:                model.Float64Ptr(12.99),
 			Currency:             "USD",
 			RegistrationPeriod:   model.IntPtr(1),
 			VerificationProvider: "test_registrar",
+			VerificationEnv:      "sandbox",
 			Verifications: []model.Check{
 				{Provider: model.ProviderRDAP, Source: model.SourceRDAP, Status: model.StatusAvailable, Available: model.BoolPtr(true)},
-				{Provider: "test_registrar", Source: model.SourceHTTP, Status: model.StatusStandardAvailable, Available: model.BoolPtr(true), Price: model.Float64Ptr(12.99), Currency: "USD", RegistrationPeriod: model.IntPtr(1)},
+				{Provider: "test_registrar", Environment: "sandbox", Source: model.SourceHTTP, Status: model.StatusStandardAvailable, Available: model.BoolPtr(true), Price: model.Float64Ptr(12.99), Currency: "USD", RegistrationPeriod: model.IntPtr(1)},
 			},
 		},
 	}
@@ -73,6 +75,12 @@ func TestWriteResultsJSON(t *testing.T) {
 	if !strings.Contains(buf.String(), `"price": 12.99`) {
 		t.Fatalf("expected pricing output: %s", buf.String())
 	}
+	if !strings.Contains(buf.String(), `"registrar_consensus": "incomplete"`) {
+		t.Fatalf("expected consensus output: %s", buf.String())
+	}
+	if !strings.Contains(buf.String(), `"verification_environment": "sandbox"`) {
+		t.Fatalf("expected environment output: %s", buf.String())
+	}
 }
 
 func TestWriteResultsTable(t *testing.T) {
@@ -86,10 +94,12 @@ func TestWriteResultsTable(t *testing.T) {
 			Source:               model.SourceHTTP,
 			RegistryStatus:       model.StatusAvailable,
 			RegistrarStatus:      model.StatusUnavailable,
+			RegistrarConsensus:   model.ConsensusConflict,
 			VerificationProvider: "test_registrar",
+			VerificationEnv:      "ote",
 			Verifications: []model.Check{
 				{Provider: model.ProviderRDAP, Source: model.SourceRDAP, Status: model.StatusAvailable, Available: model.BoolPtr(true)},
-				{Provider: "test_registrar", Source: model.SourceHTTP, Status: model.StatusUnavailable, Available: model.BoolPtr(false)},
+				{Provider: "test_registrar", Environment: "ote", Source: model.SourceHTTP, Status: model.StatusUnavailable, Available: model.BoolPtr(false)},
 			},
 		},
 	}
@@ -100,7 +110,7 @@ func TestWriteResultsTable(t *testing.T) {
 	}
 
 	output := buf.String()
-	if !strings.Contains(output, "TEST_REGISTRAR") || !strings.Contains(output, "example.com") || !strings.Contains(output, "unavailable") {
+	if !strings.Contains(output, "CONSENSUS") || !strings.Contains(output, "ENV") || !strings.Contains(output, "ote") || !strings.Contains(output, "example.com") || !strings.Contains(output, "unavailable") {
 		t.Fatalf("unexpected table output: %s", output)
 	}
 }

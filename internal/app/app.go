@@ -395,9 +395,23 @@ func providerBaseURL(provider string, cfg *Config) string {
 	}
 	switch provider {
 	case lookup.GoDaddyProviderName:
-		return firstNonEmpty(os.Getenv("GODADDY_API_BASE_URL"), os.Getenv("GODADDY_OTE_API_BASE_URL"), os.Getenv("GODADDY_PRD_API_BASE_URL"))
+		switch strings.ToLower(strings.TrimSpace(os.Getenv("GODADDY_API_ENV"))) {
+		case "prd", "prod", "production":
+			return firstNonEmpty(os.Getenv("GODADDY_API_BASE_URL"), os.Getenv("GODADDY_PRD_API_BASE_URL"), os.Getenv("GODADDY_OTE_API_BASE_URL"))
+		case "ote":
+			return firstNonEmpty(os.Getenv("GODADDY_API_BASE_URL"), os.Getenv("GODADDY_OTE_API_BASE_URL"), os.Getenv("GODADDY_PRD_API_BASE_URL"))
+		default:
+			return firstNonEmpty(os.Getenv("GODADDY_API_BASE_URL"), os.Getenv("GODADDY_OTE_API_BASE_URL"), os.Getenv("GODADDY_PRD_API_BASE_URL"))
+		}
 	case lookup.NamecheapProviderName:
-		return firstNonEmpty(os.Getenv("NAMECHEAP_API_BASE_URL"), os.Getenv("NAMECHEAP_SANDBOX_API_BASE_URL"), os.Getenv("NAMECHEAP_PRD_API_BASE_URL"))
+		switch strings.ToLower(strings.TrimSpace(os.Getenv("NAMECHEAP_API_ENV"))) {
+		case "prd", "prod", "production":
+			return firstNonEmpty(os.Getenv("NAMECHEAP_API_BASE_URL"), os.Getenv("NAMECHEAP_PRD_API_BASE_URL"), os.Getenv("NAMECHEAP_SANDBOX_API_BASE_URL"))
+		case "sandbox", "test":
+			return firstNonEmpty(os.Getenv("NAMECHEAP_API_BASE_URL"), os.Getenv("NAMECHEAP_SANDBOX_API_BASE_URL"), os.Getenv("NAMECHEAP_PRD_API_BASE_URL"))
+		default:
+			return firstNonEmpty(os.Getenv("NAMECHEAP_API_BASE_URL"), os.Getenv("NAMECHEAP_SANDBOX_API_BASE_URL"), os.Getenv("NAMECHEAP_PRD_API_BASE_URL"))
+		}
 	default:
 		return cfg.RegistrarBaseURL
 	}
@@ -423,12 +437,12 @@ func providerSummary(results []model.Result) []string {
 			if check.Provider == "" {
 				continue
 			}
-			counts[check.Provider]++
+			counts[providerSummaryKey(check.Provider, check.Environment)]++
 		}
 	}
 	lines := make([]string, 0, len(counts))
 	for provider, count := range counts {
-		lines = append(lines, fmt.Sprintf("Provider %s returned %d checks.", providerLabel(provider), count))
+		lines = append(lines, fmt.Sprintf("Provider %s returned %d checks.", provider, count))
 	}
 	return lines
 }
@@ -436,14 +450,23 @@ func providerSummary(results []model.Result) []string {
 func providerLabel(provider string) string {
 	switch provider {
 	case lookup.GoDaddyProviderName:
-		return "GoDaddy OTE"
+		return "GoDaddy"
 	case lookup.NamecheapProviderName:
-		return "Namecheap SBX"
+		return "Namecheap"
 	case model.ProviderRDAP:
 		return "RDAP"
 	default:
 		return provider
 	}
+}
+
+func providerSummaryKey(provider string, environment string) string {
+	label := providerLabel(provider)
+	env := strings.TrimSpace(environment)
+	if env == "" || provider == model.ProviderRDAP {
+		return label
+	}
+	return fmt.Sprintf("%s (%s)", label, env)
 }
 
 func resolveNamecheapCredentials(cfg *Config) {
