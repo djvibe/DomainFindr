@@ -12,9 +12,12 @@ This repository contains a Go CLI for domain availability checks.
 - `internal/output/`: table, CSV, and JSON formatting.
 - `internal/model/`: shared result and input types.
 - `docs/features/`: tracked feature planning and completed launch docs.
+- `docs/domain_research_lessons.md`: persistent lessons learned from domain strategy sessions.
 - `workspace/`: local-only batch input/output area. This path is Git-ignored.
 
 Keep new production code under `internal/` unless it is the binary entrypoint.
+
+Before starting new domain-strategy or naming workflow changes, review `docs/domain_research_lessons.md` for session-to-session context.
 
 ## Build, Test, and Development Commands
 
