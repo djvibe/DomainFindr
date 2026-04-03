@@ -31,6 +31,8 @@ Use the Go toolchain installed at `/usr/local/go/bin`, or ensure it is on `PATH`
 If sandboxed environments block the default build cache, use:
 `GOCACHE=/tmp/domainfindr-go-build-cache go test ./...`
 
+For live RDAP or registrar verification commands, prefer running outside the sandbox when needed because network access and default state/history paths are commonly blocked in sandboxed sessions. This repo guidance does not override platform approval requirements.
+
 ## Coding Style & Naming Conventions
 
 Follow standard Go conventions.
@@ -48,6 +50,7 @@ Tests use Go’s built-in `testing` package and live next to the code as `*_test
 - Name tests as `TestXxx`.
 - Prefer deterministic unit tests over live network calls.
 - Mock HTTP behavior in lookup tests rather than relying on external RDAP services.
+- When explicitly validating live registrar integrations, use escalated execution as needed instead of treating sandbox network failures as product failures.
 - Run `go test ./...` before opening a PR.
 
 ## Commit & Pull Request Guidelines

@@ -13,27 +13,23 @@ import (
 	"github.com/djvibe/domainfindr/internal/model"
 )
 
-type Checker interface {
-	Check(context.Context, string) model.Result
-}
-
-type RDAPChecker struct {
+type RDAPProvider struct {
 	BaseURL string
 	Client  *http.Client
 }
 
-func NewRDAPChecker(client *http.Client) *RDAPChecker {
+func NewRDAPChecker(client *http.Client) *RDAPProvider {
 	if client == nil {
 		client = http.DefaultClient
 	}
 
-	return &RDAPChecker{
+	return &RDAPProvider{
 		BaseURL: "https://rdap.org",
 		Client:  client,
 	}
 }
 
-func (c *RDAPChecker) Check(ctx context.Context, domain string) model.Result {
+func (c *RDAPProvider) Check(ctx context.Context, domain string) model.Result {
 	endpoint := strings.TrimRight(c.BaseURL, "/") + "/domain/" + url.PathEscape(domain)
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, endpoint, nil)
 	if err != nil {
@@ -50,17 +46,19 @@ func (c *RDAPChecker) Check(ctx context.Context, domain string) model.Result {
 	switch resp.StatusCode {
 	case http.StatusOK:
 		return model.Result{
-			Domain:    domain,
-			Available: model.BoolPtr(false),
-			Status:    model.StatusRegistered,
-			Source:    model.SourceRDAP,
+			Domain:               domain,
+			Available:            model.BoolPtr(false),
+			Status:               model.StatusRegistered,
+			Source:               model.SourceRDAP,
+			VerificationProvider: model.ProviderRDAP,
 		}
 	case http.StatusNotFound:
 		return model.Result{
-			Domain:    domain,
-			Available: model.BoolPtr(true),
-			Status:    model.StatusAvailable,
-			Source:    model.SourceRDAP,
+			Domain:               domain,
+			Available:            model.BoolPtr(true),
+			Status:               model.StatusAvailable,
+			Source:               model.SourceRDAP,
+			VerificationProvider: model.ProviderRDAP,
 		}
 	case http.StatusTooManyRequests:
 		return lookupError(domain, errors.New("rdap rate limit exceeded"))
@@ -75,10 +73,11 @@ func (c *RDAPChecker) Check(ctx context.Context, domain string) model.Result {
 
 func lookupError(domain string, err error) model.Result {
 	return model.Result{
-		Domain: domain,
-		Status: model.StatusLookupError,
-		Source: model.SourceRDAP,
-		Error:  model.StringPtr(err.Error()),
+		Domain:               domain,
+		Status:               model.StatusLookupError,
+		Source:               model.SourceRDAP,
+		VerificationProvider: model.ProviderRDAP,
+		Error:                model.StringPtr(err.Error()),
 	}
 }
 

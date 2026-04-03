@@ -1,5 +1,6 @@
 .codex
 domainFindr
+.env
 
 # Private local docs kept alongside tracked docs.
 docs/private/

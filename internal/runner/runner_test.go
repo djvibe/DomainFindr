@@ -61,6 +61,32 @@ func TestRunnerRetriesLookupErrors(t *testing.T) {
 	}
 }
 
+func TestRunnerDoesNotRetryRegistrarUnknown(t *testing.T) {
+	t.Parallel()
+
+	checker := &fakeChecker{
+		results: []model.Result{
+			{Domain: "example.com", Status: model.StatusRegistrarUnknown, Source: model.SourceHTTP, Error: model.StringPtr("timeout")},
+		},
+	}
+	limiter := &fakeLimiter{}
+
+	run := New(checker, limiter, Config{
+		Retry:       3,
+		Concurrency: 1,
+		Timeout:     time.Second,
+		Logger:      log.New(io.Discard, "", 0),
+	})
+
+	results := run.Run(context.Background(), []model.Entry{{Domain: "example.com", Valid: true}})
+	if results[0].Status != model.StatusRegistrarUnknown {
+		t.Fatalf("expected registrar_unknown, got %#v", results[0])
+	}
+	if limiter.calls != 1 {
+		t.Fatalf("expected a single limiter call, got %d", limiter.calls)
+	}
+}
+
 func TestRunnerInvalidInputBypassesLookup(t *testing.T) {
 	t.Parallel()
 

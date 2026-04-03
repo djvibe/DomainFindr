@@ -25,7 +25,12 @@ func WriteResults(w io.Writer, format string, results []model.Result) error {
 
 func writeCSV(w io.Writer, results []model.Result) error {
 	writer := csv.NewWriter(w)
-	if err := writer.Write([]string{"domain", "available", "status", "source", "error"}); err != nil {
+	providers := collectProviders(results)
+	headers := []string{"domain", "available", "status", "source", "registry_status", "registrar_status", "pricing_class", "price", "currency", "registration_period", "verification_provider", "error"}
+	for _, provider := range providers {
+		headers = append(headers, provider+"_result")
+	}
+	if err := writer.Write(headers); err != nil {
 		return err
 	}
 
@@ -35,7 +40,17 @@ func writeCSV(w io.Writer, results []model.Result) error {
 			boolString(result.Available),
 			result.Status,
 			result.Source,
+			result.RegistryStatus,
+			result.RegistrarStatus,
+			result.PricingClass,
+			floatString(result.Price),
+			result.Currency,
+			intString(result.RegistrationPeriod),
+			displayProvider(result.VerificationProvider),
 			stringValue(result.Error),
+		}
+		for _, provider := range providers {
+			record = append(record, providerCell(findCheck(result, provider)))
 		}
 		if err := writer.Write(record); err != nil {
 			return err
@@ -53,18 +68,37 @@ func writeJSON(w io.Writer, results []model.Result) error {
 }
 
 func writeTable(w io.Writer, results []model.Result) error {
-	headers := []string{"DOMAIN", "AVAILABLE", "STATUS", "SOURCE", "ERROR"}
-	widths := []int{len(headers[0]), len(headers[1]), len(headers[2]), len(headers[3]), len(headers[4])}
-	rows := make([][]string, 0, len(results))
+	providers := collectProviders(results)
+	headers := []string{"DOMAIN", "FINAL", "RDAP", "REGISTRAR", "PRICE"}
+	for _, provider := range providers {
+		if provider == model.ProviderRDAP {
+			continue
+		}
+		headers = append(headers, strings.ToUpper(displayProvider(provider)))
+	}
+	headers = append(headers, "ERROR")
 
+	widths := make([]int, len(headers))
+	for i, header := range headers {
+		widths[i] = len(header)
+	}
+
+	rows := make([][]string, 0, len(results))
 	for _, result := range results {
 		row := []string{
 			result.Domain,
-			tableAvailability(result.Available),
-			result.Status,
-			result.Source,
-			stringValue(result.Error),
+			finalCell(result),
+			result.RegistryStatus,
+			result.RegistrarStatus,
+			priceCell(result.Price, result.Currency, result.RegistrationPeriod),
 		}
+		for _, provider := range providers {
+			if provider == model.ProviderRDAP {
+				continue
+			}
+			row = append(row, providerCell(findCheck(result, provider)))
+		}
+		row = append(row, stringValue(result.Error))
 		rows = append(rows, row)
 		for idx, cell := range row {
 			if len(cell) > widths[idx] {
@@ -76,12 +110,9 @@ func writeTable(w io.Writer, results []model.Result) error {
 	if _, err := fmt.Fprintln(w, formatRow(headers, widths)); err != nil {
 		return err
 	}
-	divider := []string{
-		strings.Repeat("-", widths[0]),
-		strings.Repeat("-", widths[1]),
-		strings.Repeat("-", widths[2]),
-		strings.Repeat("-", widths[3]),
-		strings.Repeat("-", widths[4]),
+	divider := make([]string, len(headers))
+	for i := range divider {
+		divider[i] = strings.Repeat("-", widths[i])
 	}
 	if _, err := fmt.Fprintln(w, formatRow(divider, widths)); err != nil {
 		return err
@@ -113,19 +144,102 @@ func boolString(value *bool) string {
 	return "false"
 }
 
-func tableAvailability(value *bool) string {
-	if value == nil {
-		return ""
-	}
-	if *value {
-		return "Yes"
-	}
-	return "No"
-}
-
 func stringValue(value *string) string {
 	if value == nil {
 		return ""
 	}
 	return *value
+}
+
+func floatString(value *float64) string {
+	if value == nil {
+		return ""
+	}
+	return fmt.Sprintf("%.2f", *value)
+}
+
+func intString(value *int) string {
+	if value == nil {
+		return ""
+	}
+	return fmt.Sprintf("%d", *value)
+}
+
+func collectProviders(results []model.Result) []string {
+	seen := map[string]bool{}
+	providers := make([]string, 0)
+	for _, result := range results {
+		for _, check := range result.Verifications {
+			if check.Provider == "" || seen[check.Provider] {
+				continue
+			}
+			seen[check.Provider] = true
+			providers = append(providers, check.Provider)
+		}
+	}
+	return providers
+}
+
+func findCheck(result model.Result, provider string) *model.Check {
+	for i := range result.Verifications {
+		if result.Verifications[i].Provider == provider {
+			return &result.Verifications[i]
+		}
+	}
+	return nil
+}
+
+func finalCell(result model.Result) string {
+	return strings.TrimSpace(strings.Join([]string{result.Status, availabilityTag(result.Available)}, " "))
+}
+
+func availabilityTag(value *bool) string {
+	if value == nil {
+		return ""
+	}
+	if *value {
+		return "(yes)"
+	}
+	return "(no)"
+}
+
+func priceCell(price *float64, currency string, term *int) string {
+	value := floatString(price)
+	if value == "" {
+		return ""
+	}
+	if currency != "" {
+		value += " " + currency
+	}
+	if term != nil {
+		value += "/" + intString(term) + "y"
+	}
+	return value
+}
+
+func providerCell(check *model.Check) string {
+	if check == nil {
+		return ""
+	}
+	cell := check.Status
+	if check.Price != nil {
+		cell += " " + priceCell(check.Price, check.Currency, check.RegistrationPeriod)
+	}
+	if check.Error != nil && *check.Error != "" {
+		cell += " err"
+	}
+	return strings.TrimSpace(cell)
+}
+
+func displayProvider(provider string) string {
+	switch provider {
+	case "godaddy":
+		return "GoDaddy OTE"
+	case "namecheap":
+		return "Namecheap SBX"
+	case model.ProviderRDAP:
+		return "RDAP"
+	default:
+		return provider
+	}
 }

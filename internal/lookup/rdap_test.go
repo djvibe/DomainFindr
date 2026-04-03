@@ -39,6 +39,9 @@ func TestRDAPCheckerRegistered(t *testing.T) {
 	if result.Status != model.StatusRegistered || result.Available == nil || *result.Available {
 		t.Fatalf("unexpected result: %#v", result)
 	}
+	if result.VerificationProvider != model.ProviderRDAP {
+		t.Fatalf("unexpected provider: %#v", result)
+	}
 }
 
 func TestRDAPCheckerAvailable(t *testing.T) {
@@ -60,6 +63,9 @@ func TestRDAPCheckerAvailable(t *testing.T) {
 
 	if result.Status != model.StatusAvailable || result.Available == nil || !*result.Available {
 		t.Fatalf("unexpected result: %#v", result)
+	}
+	if result.VerificationProvider != model.ProviderRDAP {
+		t.Fatalf("unexpected provider: %#v", result)
 	}
 }
 

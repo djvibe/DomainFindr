@@ -114,7 +114,7 @@ func (r *Runner) processEntry(ctx context.Context, entry model.Entry) model.Resu
 			return model.Result{
 				Domain: entry.Domain,
 				Status: model.StatusLookupError,
-				Source: model.SourceRDAP,
+				Source: model.SourceInput,
 				Error:  model.StringPtr(err.Error()),
 			}
 		}
@@ -137,7 +137,7 @@ func (r *Runner) processEntry(ctx context.Context, entry model.Entry) model.Resu
 	return model.Result{
 		Domain: entry.Domain,
 		Status: model.StatusLookupError,
-		Source: model.SourceRDAP,
+		Source: model.SourceInput,
 		Error:  model.StringPtr("lookup failed"),
 	}
 }

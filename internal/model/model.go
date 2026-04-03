@@ -7,21 +7,48 @@ type Entry struct {
 }
 
 type Result struct {
-	Domain    string  `json:"domain"`
-	Available *bool   `json:"available"`
-	Status    string  `json:"status"`
-	Source    string  `json:"source"`
-	Error     *string `json:"error"`
+	Domain               string   `json:"domain"`
+	Available            *bool    `json:"available"`
+	Status               string   `json:"status"`
+	Source               string   `json:"source"`
+	RegistryStatus       string   `json:"registry_status,omitempty"`
+	RegistrarStatus      string   `json:"registrar_status,omitempty"`
+	PricingClass         string   `json:"pricing_class,omitempty"`
+	Price                *float64 `json:"price,omitempty"`
+	Currency             string   `json:"currency,omitempty"`
+	RegistrationPeriod   *int     `json:"registration_period,omitempty"`
+	VerificationProvider string   `json:"verification_provider,omitempty"`
+	Verifications        []Check  `json:"verifications,omitempty"`
+	Error                *string  `json:"error"`
+}
+
+type Check struct {
+	Provider           string   `json:"provider"`
+	Source             string   `json:"source"`
+	Available          *bool    `json:"available,omitempty"`
+	Status             string   `json:"status"`
+	PricingClass       string   `json:"pricing_class,omitempty"`
+	Price              *float64 `json:"price,omitempty"`
+	Currency           string   `json:"currency,omitempty"`
+	RegistrationPeriod *int     `json:"registration_period,omitempty"`
+	Error              *string  `json:"error,omitempty"`
 }
 
 const (
-	StatusAvailable   = "available"
-	StatusRegistered  = "registered"
-	StatusInvalid     = "invalid"
-	StatusLookupError = "lookup_error"
+	StatusAvailable         = "available"
+	StatusRegistered        = "registered"
+	StatusInvalid           = "invalid"
+	StatusLookupError       = "lookup_error"
+	StatusStandardAvailable = "standard_available"
+	StatusPremiumAvailable  = "premium_available"
+	StatusUnavailable       = "unavailable"
+	StatusRegistrarUnknown  = "registrar_unknown"
 
 	SourceInput = "input"
 	SourceRDAP  = "rdap"
+	SourceHTTP  = "http"
+
+	ProviderRDAP = "rdap"
 )
 
 func BoolPtr(v bool) *bool {
@@ -29,5 +56,13 @@ func BoolPtr(v bool) *bool {
 }
 
 func StringPtr(v string) *string {
+	return &v
+}
+
+func Float64Ptr(v float64) *float64 {
+	return &v
+}
+
+func IntPtr(v int) *int {
 	return &v
 }
