@@ -208,3 +208,126 @@ func TestVerifierPrefersCleanPremiumOverErroredStandard(t *testing.T) {
 		t.Fatalf("expected strongest provider to remain selected, got %#v", result)
 	}
 }
+
+func TestVerifierMarksRegistrarConflictWhenRegistrarsDisagree(t *testing.T) {
+	t.Parallel()
+
+	verifier := NewVerifier(
+		stubProvider{
+			result: model.Result{
+				Domain:               "example.com",
+				Available:            model.BoolPtr(true),
+				Status:               model.StatusAvailable,
+				Source:               model.SourceRDAP,
+				VerificationProvider: model.ProviderRDAP,
+			},
+		},
+		stubProvider{
+			result: model.Result{
+				Domain:               "example.com",
+				Available:            model.BoolPtr(true),
+				Status:               model.StatusStandardAvailable,
+				Source:               model.SourceHTTP,
+				PricingClass:         "standard",
+				Price:                model.Float64Ptr(12.99),
+				Currency:             "USD",
+				RegistrationPeriod:   model.IntPtr(1),
+				VerificationProvider: "godaddy",
+				VerificationEnv:      EnvironmentProduction,
+			},
+		},
+		stubProvider{
+			result: model.Result{
+				Domain:               "example.com",
+				Available:            model.BoolPtr(false),
+				Status:               model.StatusUnavailable,
+				Source:               model.SourceHTTP,
+				VerificationProvider: "namecheap",
+				VerificationEnv:      EnvironmentProduction,
+			},
+		},
+	)
+
+	result := verifier.Check(context.Background(), "example.com")
+
+	if result.RegistrarConsensus != model.ConsensusConflict {
+		t.Fatalf("expected registrar conflict, got %#v", result)
+	}
+}
+
+func TestVerifierMarksRegistrarIncompleteForSandboxEvidence(t *testing.T) {
+	t.Parallel()
+
+	verifier := NewVerifier(
+		stubProvider{
+			result: model.Result{
+				Domain:               "example.ai",
+				Available:            model.BoolPtr(true),
+				Status:               model.StatusAvailable,
+				Source:               model.SourceRDAP,
+				VerificationProvider: model.ProviderRDAP,
+			},
+		},
+		stubProvider{
+			result: model.Result{
+				Domain:               "example.ai",
+				Available:            model.BoolPtr(true),
+				Status:               model.StatusStandardAvailable,
+				Source:               model.SourceHTTP,
+				PricingClass:         "standard",
+				Price:                model.Float64Ptr(49.99),
+				Currency:             "USD",
+				RegistrationPeriod:   model.IntPtr(1),
+				VerificationProvider: "namecheap",
+				VerificationEnv:      EnvironmentSandbox,
+			},
+		},
+	)
+
+	result := verifier.Check(context.Background(), "example.ai")
+
+	if result.RegistrarConsensus != model.ConsensusIncomplete {
+		t.Fatalf("expected incomplete registrar consensus, got %#v", result)
+	}
+}
+
+func TestVerifierPrefersProductionRegistrarOverSandboxResult(t *testing.T) {
+	t.Parallel()
+
+	verifier := NewVerifier(
+		stubProvider{
+			result: model.Result{
+				Domain:               "example.ai",
+				Available:            model.BoolPtr(true),
+				Status:               model.StatusPremiumAvailable,
+				Source:               model.SourceHTTP,
+				PricingClass:         "premium",
+				Price:                model.Float64Ptr(499.0),
+				Currency:             "USD",
+				RegistrationPeriod:   model.IntPtr(1),
+				VerificationProvider: "godaddy",
+				VerificationEnv:      EnvironmentSandbox,
+			},
+		},
+		stubProvider{
+			result: model.Result{
+				Domain:               "example.ai",
+				Available:            model.BoolPtr(true),
+				Status:               model.StatusStandardAvailable,
+				Source:               model.SourceHTTP,
+				PricingClass:         "standard",
+				Price:                model.Float64Ptr(24.99),
+				Currency:             "USD",
+				RegistrationPeriod:   model.IntPtr(1),
+				VerificationProvider: "namecheap",
+				VerificationEnv:      EnvironmentProduction,
+			},
+		},
+	)
+
+	result := verifier.Check(context.Background(), "example.ai")
+
+	if result.VerificationProvider != "namecheap" || result.VerificationEnv != EnvironmentProduction {
+		t.Fatalf("expected production registrar to win, got %#v", result)
+	}
+}

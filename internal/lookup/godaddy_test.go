@@ -51,6 +51,9 @@ func TestGoDaddyProviderStandardAvailable(t *testing.T) {
 	if result.VerificationProvider != GoDaddyProviderName {
 		t.Fatalf("unexpected provider: %#v", result)
 	}
+	if result.VerificationEnv != EnvironmentCustom {
+		t.Fatalf("expected custom environment, got %#v", result)
+	}
 }
 
 func TestGoDaddyProviderPremiumAvailable(t *testing.T) {

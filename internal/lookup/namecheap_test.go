@@ -81,6 +81,9 @@ func TestNamecheapProviderStandardAvailableUsesPricingLookup(t *testing.T) {
 	if calls != 2 {
 		t.Fatalf("expected 2 API calls, got %d", calls)
 	}
+	if result.VerificationEnv != EnvironmentSandbox {
+		t.Fatalf("expected sandbox environment, got %#v", result)
+	}
 }
 
 func TestNamecheapProviderPremiumAvailable(t *testing.T) {

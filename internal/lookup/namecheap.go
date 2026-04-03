@@ -60,16 +60,21 @@ func NewNamecheapProvider(apiUser string, apiKey string, userName string, client
 }
 
 func (p *NamecheapProvider) Check(ctx context.Context, domain string) model.Result {
+	environment := providerEnvironment(NamecheapProviderName, p.BaseURL)
 	checkResponse, err := p.call(ctx, url.Values{
 		"Command":    []string{"namecheap.domains.check"},
 		"DomainList": []string{domain},
 	})
 	if err != nil {
-		return registrarUnknown(domain, NamecheapProviderName, err)
+		result := registrarUnknown(domain, NamecheapProviderName, err)
+		result.VerificationEnv = environment
+		return result
 	}
 
 	if len(checkResponse.CommandResponse.DomainCheckResults) == 0 {
-		return registrarUnknown(domain, NamecheapProviderName, fmt.Errorf("namecheap response missing domain check result"))
+		result := registrarUnknown(domain, NamecheapProviderName, fmt.Errorf("namecheap response missing domain check result"))
+		result.VerificationEnv = environment
+		return result
 	}
 
 	item := checkResponse.CommandResponse.DomainCheckResults[0]
@@ -78,6 +83,7 @@ func (p *NamecheapProvider) Check(ctx context.Context, domain string) model.Resu
 		Available:            model.BoolPtr(item.Available),
 		Source:               model.SourceHTTP,
 		VerificationProvider: NamecheapProviderName,
+		VerificationEnv:      environment,
 	}
 
 	if !item.Available {

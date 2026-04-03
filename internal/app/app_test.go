@@ -194,3 +194,25 @@ func TestParseFlagsResolvesSandboxNamecheapCredentials(t *testing.T) {
 		t.Fatalf("expected sandbox base url, got %#v", cfg)
 	}
 }
+
+func TestProviderSummaryKeyIncludesEnvironmentForRegistrars(t *testing.T) {
+	t.Parallel()
+
+	if got := providerSummaryKey("godaddy", "ote"); got != "GoDaddy (ote)" {
+		t.Fatalf("unexpected provider summary key: %q", got)
+	}
+	if got := providerSummaryKey("rdap", "registry"); got != "RDAP" {
+		t.Fatalf("unexpected rdap provider summary key: %q", got)
+	}
+}
+
+func TestProviderBaseURLPrefersProductionWhenConfigured(t *testing.T) {
+	t.Setenv("GODADDY_API_ENV", "prd")
+	t.Setenv("GODADDY_OTE_API_BASE_URL", "https://ote.example.test")
+	t.Setenv("GODADDY_PRD_API_BASE_URL", "https://prd.example.test")
+
+	got := providerBaseURL("godaddy", &Config{RegistrarProviders: []string{"godaddy", "namecheap"}})
+	if got != "https://prd.example.test" {
+		t.Fatalf("expected production base url, got %q", got)
+	}
+}

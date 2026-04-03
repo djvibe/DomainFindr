@@ -26,7 +26,7 @@ func WriteResults(w io.Writer, format string, results []model.Result) error {
 func writeCSV(w io.Writer, results []model.Result) error {
 	writer := csv.NewWriter(w)
 	providers := collectProviders(results)
-	headers := []string{"domain", "available", "status", "source", "registry_status", "registrar_status", "pricing_class", "price", "currency", "registration_period", "verification_provider", "error"}
+	headers := []string{"domain", "available", "status", "source", "registry_status", "registrar_status", "registrar_consensus", "pricing_class", "price", "currency", "registration_period", "verification_provider", "verification_environment", "error"}
 	for _, provider := range providers {
 		headers = append(headers, provider+"_result")
 	}
@@ -42,11 +42,13 @@ func writeCSV(w io.Writer, results []model.Result) error {
 			result.Source,
 			result.RegistryStatus,
 			result.RegistrarStatus,
+			result.RegistrarConsensus,
 			result.PricingClass,
 			floatString(result.Price),
 			result.Currency,
 			intString(result.RegistrationPeriod),
 			displayProvider(result.VerificationProvider),
+			displayEnvironment(result.VerificationEnv),
 			stringValue(result.Error),
 		}
 		for _, provider := range providers {
@@ -69,7 +71,7 @@ func writeJSON(w io.Writer, results []model.Result) error {
 
 func writeTable(w io.Writer, results []model.Result) error {
 	providers := collectProviders(results)
-	headers := []string{"DOMAIN", "FINAL", "RDAP", "REGISTRAR", "PRICE"}
+	headers := []string{"DOMAIN", "FINAL", "RDAP", "REGISTRAR", "CONSENSUS", "ENV", "PRICE"}
 	for _, provider := range providers {
 		if provider == model.ProviderRDAP {
 			continue
@@ -90,6 +92,8 @@ func writeTable(w io.Writer, results []model.Result) error {
 			finalCell(result),
 			result.RegistryStatus,
 			result.RegistrarStatus,
+			result.RegistrarConsensus,
+			displayEnvironment(result.VerificationEnv),
 			priceCell(result.Price, result.Currency, result.RegistrationPeriod),
 		}
 		for _, provider := range providers {
@@ -222,6 +226,9 @@ func providerCell(check *model.Check) string {
 		return ""
 	}
 	cell := check.Status
+	if env := displayEnvironment(check.Environment); env != "" {
+		cell += " [" + env + "]"
+	}
 	if check.Price != nil {
 		cell += " " + priceCell(check.Price, check.Currency, check.RegistrationPeriod)
 	}
@@ -231,12 +238,27 @@ func providerCell(check *model.Check) string {
 	return strings.TrimSpace(cell)
 }
 
+func displayEnvironment(environment string) string {
+	switch environment {
+	case "":
+		return ""
+	case "production":
+		return "prod"
+	case "sandbox":
+		return "sandbox"
+	case "ote":
+		return "ote"
+	default:
+		return environment
+	}
+}
+
 func displayProvider(provider string) string {
 	switch provider {
 	case "godaddy":
-		return "GoDaddy OTE"
+		return "GoDaddy"
 	case "namecheap":
-		return "Namecheap SBX"
+		return "Namecheap"
 	case model.ProviderRDAP:
 		return "RDAP"
 	default:

@@ -4,21 +4,25 @@
 
 Track the next work items after phase 1 registrar-aware verification.
 
+## Status Update
+
+The following slices are now completed:
+
+- explicit registrar `consensus` / `conflict` / `incomplete` labeling
+- explicit provider environment labeling in result output
+- confidence-aware registrar merge weighting that favors clean production evidence over sandbox, OTE, or partial pricing evidence
+
+See `docs/features/done/RegistrarVerificationConfidenceAndEnvironmentLabels.md` for implementation notes.
+
 ## Follow-Up Areas
 
 ### 1. Explicit conflict handling
 
-- add a `conflict` or `consensus` field
-- distinguish:
-  - aligned registrar confirmation
-  - provider disagreement
-  - incomplete registrar evidence
+Completed.
 
 ### 2. Environment awareness
 
-- mark provider environment explicitly in output
-- avoid presenting sandbox or OTE pricing as production-grade purchase truth
-- support environment labels in JSON, CSV, and table output
+Completed.
 
 ### 3. Registrar retry and timeout hardening
 
@@ -28,11 +32,18 @@ Track the next work items after phase 1 registrar-aware verification.
 
 ### 4. Provider ranking / confidence
 
-- add confidence weighting for:
-  - production vs sandbox
-  - priced vs unpriced results
-  - clean vs partial results
-- consider making the merged registrar status confidence-aware instead of rank-only
+Partially completed.
+
+Implemented:
+
+- confidence weighting for production vs sandbox / OTE / custom
+- confidence weighting for priced vs unpriced available results
+- confidence weighting for clean vs partial / errored results
+
+Still open:
+
+- tune weighting against additional real production registrar behavior
+- decide whether to expose an explicit numeric confidence score in output
 
 ### 5. Production registrar rollout
 

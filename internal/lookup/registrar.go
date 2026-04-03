@@ -34,20 +34,27 @@ func NewRegistrarHTTPProvider(name string, client *http.Client, baseURL string) 
 
 func (p *RegistrarHTTPProvider) Check(ctx context.Context, domain string) model.Result {
 	endpoint := strings.TrimRight(p.BaseURL, "/") + "/availability/" + url.PathEscape(domain)
+	environment := providerEnvironment(p.Name, p.BaseURL)
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, endpoint, nil)
 	if err != nil {
-		return registrarUnknown(domain, p.Name, fmt.Errorf("build request: %w", err))
+		result := registrarUnknown(domain, p.Name, fmt.Errorf("build request: %w", err))
+		result.VerificationEnv = environment
+		return result
 	}
 	req.Header.Set("Accept", "application/json")
 
 	resp, err := p.Client.Do(req)
 	if err != nil {
-		return registrarUnknown(domain, p.Name, err)
+		result := registrarUnknown(domain, p.Name, err)
+		result.VerificationEnv = environment
+		return result
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		return registrarUnknown(domain, p.Name, fmt.Errorf("registrar lookup failed: %s", resp.Status))
+		result := registrarUnknown(domain, p.Name, fmt.Errorf("registrar lookup failed: %s", resp.Status))
+		result.VerificationEnv = environment
+		return result
 	}
 
 	var payload struct {
@@ -59,7 +66,9 @@ func (p *RegistrarHTTPProvider) Check(ctx context.Context, domain string) model.
 		RegistrationPeriod *int     `json:"registration_period"`
 	}
 	if err := json.NewDecoder(resp.Body).Decode(&payload); err != nil {
-		return registrarUnknown(domain, p.Name, fmt.Errorf("decode registrar response: %w", err))
+		result := registrarUnknown(domain, p.Name, fmt.Errorf("decode registrar response: %w", err))
+		result.VerificationEnv = environment
+		return result
 	}
 
 	result := model.Result{
@@ -72,6 +81,7 @@ func (p *RegistrarHTTPProvider) Check(ctx context.Context, domain string) model.
 		Currency:             payload.Currency,
 		RegistrationPeriod:   payload.RegistrationPeriod,
 		VerificationProvider: p.Name,
+		VerificationEnv:      environment,
 	}
 	if result.Status == model.StatusPremiumAvailable && result.PricingClass == "" {
 		result.PricingClass = "premium"

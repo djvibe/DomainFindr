@@ -39,6 +39,7 @@ func (v *Verifier) Check(ctx context.Context, domain string) model.Result {
 		current := provider.Check(ctx, domain)
 		result.Verifications = append(result.Verifications, model.Check{
 			Provider:           current.VerificationProvider,
+			Environment:        current.VerificationEnv,
 			Source:             current.Source,
 			Available:          current.Available,
 			Status:             current.Status,
@@ -71,6 +72,8 @@ func (v *Verifier) Check(ctx context.Context, domain string) model.Result {
 		}
 	}
 
+	result.RegistrarConsensus = summarizeRegistrarConsensus(result.Verifications)
+
 	if result.Status == "" {
 		result.Status = model.StatusLookupError
 		result.Source = model.SourceInput
@@ -84,6 +87,7 @@ func applyRegistrarTruth(result *model.Result, registrar model.Result) {
 	if shouldReplaceRegistrarResult(*result, registrar) {
 		result.RegistrarStatus = registrar.Status
 		result.VerificationProvider = registrar.VerificationProvider
+		result.VerificationEnv = registrar.VerificationEnv
 		result.PricingClass = registrar.PricingClass
 		result.Price = registrar.Price
 		result.Currency = registrar.Currency
@@ -113,6 +117,7 @@ func shouldReplaceRegistrarResult(current model.Result, candidate model.Result) 
 	}
 	return registrarRank(candidate) > registrarRank(model.Result{
 		Status:             current.RegistrarStatus,
+		VerificationEnv:    current.VerificationEnv,
 		PricingClass:       current.PricingClass,
 		Price:              current.Price,
 		Currency:           current.Currency,
@@ -125,19 +130,87 @@ func registrarRank(result model.Result) int {
 	score := 0
 	switch result.Status {
 	case model.StatusUnavailable:
-		score = 50
+		score = 70
 	case model.StatusPremiumAvailable:
-		score = 40
+		score = 55
 	case model.StatusStandardAvailable:
-		score = 30
+		score = 45
 	case model.StatusRegistrarUnknown:
 		score = 10
 	}
-	if result.Error == nil || *result.Error == "" {
+
+	switch result.VerificationEnv {
+	case EnvironmentProduction:
+		score += 25
+	case EnvironmentCustom:
+		score += 10
+	case EnvironmentOTE:
 		score += 5
+	case EnvironmentSandbox:
+		score += 2
 	}
-	if result.Price != nil {
-		score += 3
+
+	if result.Error == nil || *result.Error == "" {
+		score += 8
+	} else {
+		score -= 10
 	}
+
+	if hasCompleteRegistrarPricing(result) {
+		score += 12
+	} else if result.Status == model.StatusStandardAvailable || result.Status == model.StatusPremiumAvailable {
+		score -= 8
+	}
+
 	return score
+}
+
+func hasCompleteRegistrarPricing(result model.Result) bool {
+	if result.Status != model.StatusStandardAvailable && result.Status != model.StatusPremiumAvailable {
+		return true
+	}
+	return result.Price != nil && result.Currency != "" && result.RegistrationPeriod != nil
+}
+
+func summarizeRegistrarConsensus(checks []model.Check) string {
+	statuses := make([]string, 0)
+	hasIncompleteEvidence := false
+
+	for _, check := range checks {
+		if check.Provider == "" || check.Provider == model.ProviderRDAP || check.Status == "" {
+			continue
+		}
+		statuses = append(statuses, check.Status)
+		if registrarCheckIncomplete(check) {
+			hasIncompleteEvidence = true
+		}
+	}
+
+	if len(statuses) == 0 {
+		return ""
+	}
+	if hasIncompleteEvidence {
+		return model.ConsensusIncomplete
+	}
+
+	first := statuses[0]
+	for _, status := range statuses[1:] {
+		if status != first {
+			return model.ConsensusConflict
+		}
+	}
+	return model.ConsensusConsensus
+}
+
+func registrarCheckIncomplete(check model.Check) bool {
+	if check.Error != nil && *check.Error != "" {
+		return true
+	}
+	if check.Environment == EnvironmentSandbox || check.Environment == EnvironmentOTE || check.Environment == EnvironmentCustom {
+		return true
+	}
+	if check.Status == model.StatusStandardAvailable || check.Status == model.StatusPremiumAvailable {
+		return check.Price == nil || check.Currency == "" || check.RegistrationPeriod == nil
+	}
+	return false
 }

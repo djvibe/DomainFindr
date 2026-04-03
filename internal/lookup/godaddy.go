@@ -41,21 +41,26 @@ func NewGoDaddyProvider(key string, secret string, client *http.Client, baseURL 
 
 func (p *GoDaddyProvider) Check(ctx context.Context, domain string) model.Result {
 	endpoint := strings.TrimRight(p.BaseURL, "/") + "/v1/domains/available?domain=" + url.QueryEscape(domain) + "&checkType=FULL"
+	environment := providerEnvironment(GoDaddyProviderName, p.BaseURL)
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, endpoint, nil)
 	if err != nil {
-		return registrarUnknown(domain, GoDaddyProviderName, fmt.Errorf("build request: %w", err))
+		result := registrarUnknown(domain, GoDaddyProviderName, fmt.Errorf("build request: %w", err))
+		result.VerificationEnv = environment
+		return result
 	}
 	req.Header.Set("Authorization", "sso-key "+p.Key+":"+p.Secret)
 	req.Header.Set("Accept", "application/json")
 
 	resp, err := p.Client.Do(req)
 	if err != nil {
-		return registrarUnknown(domain, GoDaddyProviderName, err)
+		result := registrarUnknown(domain, GoDaddyProviderName, err)
+		result.VerificationEnv = environment
+		return result
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		return goDaddyAPIError(domain, resp)
+		return goDaddyAPIError(domain, environment, resp)
 	}
 
 	var payload struct {
@@ -77,6 +82,7 @@ func (p *GoDaddyProvider) Check(ctx context.Context, domain string) model.Result
 		Source:               model.SourceHTTP,
 		Currency:             payload.Currency,
 		VerificationProvider: GoDaddyProviderName,
+		VerificationEnv:      environment,
 	}
 	if payload.Period > 0 {
 		result.RegistrationPeriod = model.IntPtr(payload.Period)
@@ -102,17 +108,21 @@ func (p *GoDaddyProvider) Check(ctx context.Context, domain string) model.Result
 	return result
 }
 
-func goDaddyAPIError(domain string, resp *http.Response) model.Result {
+func goDaddyAPIError(domain string, environment string, resp *http.Response) model.Result {
 	var payload struct {
 		Code    string `json:"code"`
 		Message string `json:"message"`
 	}
 	if err := json.NewDecoder(resp.Body).Decode(&payload); err == nil && (payload.Code != "" || payload.Message != "") {
 		msg := strings.TrimSpace(payload.Code + ": " + payload.Message)
-		return registrarUnknown(domain, GoDaddyProviderName, fmt.Errorf("godaddy api %s", strings.Trim(msg, ": ")))
+		result := registrarUnknown(domain, GoDaddyProviderName, fmt.Errorf("godaddy api %s", strings.Trim(msg, ": ")))
+		result.VerificationEnv = environment
+		return result
 	}
 
-	return registrarUnknown(domain, GoDaddyProviderName, fmt.Errorf("godaddy api status %s", resp.Status))
+	result := registrarUnknown(domain, GoDaddyProviderName, fmt.Errorf("godaddy api status %s", resp.Status))
+	result.VerificationEnv = environment
+	return result
 }
 
 func NormalizeProviderName(value string) string {
