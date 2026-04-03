@@ -23,6 +23,10 @@ type GoDaddyProvider struct {
 	Client  *http.Client
 }
 
+func (p *GoDaddyProvider) Kind() ProviderKind {
+	return ProviderKindRegistrar
+}
+
 func NewGoDaddyProvider(key string, secret string, client *http.Client, baseURL string) *GoDaddyProvider {
 	if client == nil {
 		client = http.DefaultClient
@@ -116,11 +120,17 @@ func goDaddyAPIError(domain string, environment string, resp *http.Response) mod
 	if err := json.NewDecoder(resp.Body).Decode(&payload); err == nil && (payload.Code != "" || payload.Message != "") {
 		msg := strings.TrimSpace(payload.Code + ": " + payload.Message)
 		result := registrarUnknown(domain, GoDaddyProviderName, fmt.Errorf("godaddy api %s", strings.Trim(msg, ": ")))
+		if isTransientRegistrarHTTPStatus(resp.StatusCode) {
+			result = markRegistrarFailure(result, true, resp.StatusCode == http.StatusRequestTimeout || resp.StatusCode == http.StatusGatewayTimeout)
+		}
 		result.VerificationEnv = environment
 		return result
 	}
 
 	result := registrarUnknown(domain, GoDaddyProviderName, fmt.Errorf("godaddy api status %s", resp.Status))
+	if isTransientRegistrarHTTPStatus(resp.StatusCode) {
+		result = markRegistrarFailure(result, true, resp.StatusCode == http.StatusRequestTimeout || resp.StatusCode == http.StatusGatewayTimeout)
+	}
 	result.VerificationEnv = environment
 	return result
 }

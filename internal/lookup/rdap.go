@@ -18,6 +18,10 @@ type RDAPProvider struct {
 	Client  *http.Client
 }
 
+func (c *RDAPProvider) Kind() ProviderKind {
+	return ProviderKindRDAP
+}
+
 func NewRDAPChecker(client *http.Client) *RDAPProvider {
 	if client == nil {
 		client = http.DefaultClient

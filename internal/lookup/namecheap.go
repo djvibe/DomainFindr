@@ -31,6 +31,10 @@ type NamecheapProvider struct {
 	pricingCache map[string]namecheapPricing
 }
 
+func (p *NamecheapProvider) Kind() ProviderKind {
+	return ProviderKindRegistrar
+}
+
 type namecheapPricing struct {
 	price    *float64
 	currency string

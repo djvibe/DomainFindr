@@ -2,6 +2,7 @@ package lookup
 
 import (
 	"context"
+	"time"
 
 	"github.com/djvibe/domainfindr/internal/model"
 )
@@ -12,31 +13,118 @@ type Checker interface {
 
 type Provider interface {
 	Check(context.Context, string) model.Result
+	Kind() ProviderKind
+}
+
+type ProviderKind string
+
+const (
+	ProviderKindRDAP      ProviderKind = "rdap"
+	ProviderKindRegistrar ProviderKind = "registrar"
+)
+
+type VerifierConfig struct {
+	RegistrarRetry   int
+	RegistrarTimeout time.Duration
+	RegistrarRecheck int
 }
 
 type Verifier struct {
 	providers []Provider
+	config    VerifierConfig
 }
 
 func NewVerifier(providers ...Provider) *Verifier {
+	return NewVerifierWithConfig(VerifierConfig{}, providers...)
+}
+
+func NewVerifierWithConfig(cfg VerifierConfig, providers ...Provider) *Verifier {
 	filtered := make([]Provider, 0, len(providers))
 	for _, provider := range providers {
 		if provider != nil {
 			filtered = append(filtered, provider)
 		}
 	}
-	return &Verifier{providers: filtered}
+	return &Verifier{
+		providers: filtered,
+		config:    cfg,
+	}
 }
 
 func (v *Verifier) Check(ctx context.Context, domain string) model.Result {
+	providerResults := make([]model.Result, len(v.providers))
+	recheckTargets := make([]int, 0)
+
+	for i, provider := range v.providers {
+		current := v.checkProvider(ctx, domain, provider)
+		providerResults[i] = current
+		if shouldRecheckRegistrarResult(current) {
+			recheckTargets = append(recheckTargets, i)
+		}
+	}
+
+	if v.config.RegistrarRecheck > 0 && len(recheckTargets) > 0 {
+		remaining := recheckTargets
+		for pass := 0; pass < v.config.RegistrarRecheck && len(remaining) > 0; pass++ {
+			next := make([]int, 0)
+			for _, idx := range remaining {
+				current := v.checkProvider(ctx, domain, v.providers[idx])
+				providerResults[idx] = current
+				if shouldRecheckRegistrarResult(current) {
+					next = append(next, idx)
+				}
+			}
+			remaining = next
+		}
+	}
+
+	result := mergeProviderResults(domain, providerResults)
+	result.RegistrarConsensus = summarizeRegistrarConsensus(result.Verifications)
+
+	if result.Status == "" {
+		result.Status = model.StatusLookupError
+		result.Source = model.SourceInput
+		result.Error = model.StringPtr("no availability providers configured")
+	}
+
+	return result
+}
+
+func (v *Verifier) checkProvider(ctx context.Context, domain string, provider Provider) model.Result {
+	if provider.Kind() != ProviderKindRegistrar {
+		return provider.Check(ctx, domain)
+	}
+
+	attempts := v.config.RegistrarRetry + 1
+	if attempts < 1 {
+		attempts = 1
+	}
+
+	for attempt := 1; attempt <= attempts; attempt++ {
+		attemptCtx := ctx
+		cancel := func() {}
+		if v.config.RegistrarTimeout > 0 {
+			attemptCtx, cancel = context.WithTimeout(ctx, v.config.RegistrarTimeout)
+		}
+		result := provider.Check(attemptCtx, domain)
+		cancel()
+
+		if !shouldRetryRegistrarResult(result) || attempt == attempts {
+			return result
+		}
+	}
+
+	return registrarUnknown(domain, "registrar", context.DeadlineExceeded)
+}
+
+func mergeProviderResults(domain string, providerResults []model.Result) model.Result {
 	result := model.Result{
 		Domain: domain,
 		Source: model.SourceInput,
 	}
 	hasRegistrarProvider := false
 
-	for _, provider := range v.providers {
-		current := provider.Check(ctx, domain)
+	for _, current := range providerResults {
 		result.Verifications = append(result.Verifications, model.Check{
 			Provider:           current.VerificationProvider,
 			Environment:        current.VerificationEnv,
@@ -48,6 +136,8 @@ func (v *Verifier) Check(ctx context.Context, domain string) model.Result {
 			Currency:           current.Currency,
 			RegistrationPeriod: current.RegistrationPeriod,
 			Error:              current.Error,
+			Transient:          current.Transient,
+			TimedOut:           current.TimedOut,
 		})
 		switch current.Source {
 		case model.SourceRDAP:
@@ -72,15 +162,15 @@ func (v *Verifier) Check(ctx context.Context, domain string) model.Result {
 		}
 	}
 
-	result.RegistrarConsensus = summarizeRegistrarConsensus(result.Verifications)
-
-	if result.Status == "" {
-		result.Status = model.StatusLookupError
-		result.Source = model.SourceInput
-		result.Error = model.StringPtr("no availability providers configured")
-	}
-
 	return result
+}
+
+func shouldRetryRegistrarResult(result model.Result) bool {
+	return result.Status == model.StatusRegistrarUnknown && (result.Transient || result.TimedOut)
+}
+
+func shouldRecheckRegistrarResult(result model.Result) bool {
+	return shouldRetryRegistrarResult(result)
 }
 
 func applyRegistrarTruth(result *model.Result, registrar model.Result) {

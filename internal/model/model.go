@@ -22,6 +22,8 @@ type Result struct {
 	VerificationEnv      string   `json:"verification_environment,omitempty"`
 	Verifications        []Check  `json:"verifications,omitempty"`
 	Error                *string  `json:"error"`
+	Transient            bool     `json:"-"`
+	TimedOut             bool     `json:"-"`
 }
 
 type Check struct {
@@ -35,6 +37,8 @@ type Check struct {
 	Currency           string   `json:"currency,omitempty"`
 	RegistrationPeriod *int     `json:"registration_period,omitempty"`
 	Error              *string  `json:"error,omitempty"`
+	Transient          bool     `json:"-"`
+	TimedOut           bool     `json:"-"`
 }
 
 const (

@@ -27,6 +27,9 @@ type Config struct {
 	Delay              time.Duration
 	Retry              int
 	Timeout            time.Duration
+	RegistrarRetry     int
+	RegistrarTimeout   time.Duration
+	RegistrarRecheck   int
 	Verbose            bool
 	Domains            []string
 	LogFile            string
@@ -114,7 +117,11 @@ func Run(ctx context.Context, args []string, stdout io.Writer, stderr io.Writer)
 			providers = append(providers, lookup.NewRegistrarHTTPProvider(providerName, httpClient, cfg.RegistrarBaseURL))
 		}
 	}
-	checker := lookup.NewVerifier(providers...)
+	checker := lookup.NewVerifierWithConfig(lookup.VerifierConfig{
+		RegistrarRetry:   cfg.RegistrarRetry,
+		RegistrarTimeout: cfg.RegistrarTimeout,
+		RegistrarRecheck: cfg.RegistrarRecheck,
+	}, providers...)
 	run := runner.New(checker, nil, runner.Config{
 		Concurrency: cfg.Concurrency,
 		Delay:       cfg.Delay,
@@ -170,6 +177,9 @@ func parseFlags(args []string, stderr io.Writer) (*Config, error) {
 	fs.DurationVar(&cfg.Delay, "delay", time.Second, "Minimum delay between outbound lookups")
 	fs.IntVar(&cfg.Retry, "retry", 2, "Retries for transient lookup failures")
 	fs.DurationVar(&cfg.Timeout, "timeout", 10*time.Second, "Timeout per lookup attempt")
+	fs.IntVar(&cfg.RegistrarRetry, "registrar-retry", 1, "Retries for transient registrar verification failures")
+	fs.DurationVar(&cfg.RegistrarTimeout, "registrar-timeout", 3*time.Second, "Timeout per registrar verification attempt")
+	fs.IntVar(&cfg.RegistrarRecheck, "registrar-recheck", 1, "Additional registrar-only recheck passes for transient registrar_unknown results")
 	fs.BoolVar(&cfg.Verbose, "verbose", false, "Enable verbose logging")
 	fs.BoolVar(&cfg.Verbose, "v", false, "Enable verbose logging")
 	fs.StringVar(&cfg.LogFile, "log-file", "", "Write logs to a file")
