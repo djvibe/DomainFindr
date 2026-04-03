@@ -1,5 +1,31 @@
 # Registrar Pricing And Purchase Integration
 
+## Status
+
+Partially completed.
+
+Phases 1 and 2 are effectively done in the current codebase:
+
+- registrar provider abstraction exists
+- registrar-backed availability checks exist
+- results already include `price`, `currency`, and `registration_period`
+- table, CSV, and JSON outputs already surface registrar pricing fields
+- budget filtering exists via `--budget-min` and `--budget-max`
+- price sorting exists via `--sort price`
+- standard-price filtering exists via `--only-standard-price`
+- summary output now includes price-tier breakdowns
+
+Related completed work:
+
+- `docs/features/done/RegistrarAwareAvailabilityVerification.md`
+- `docs/features/done/RegistrarVerificationConfidenceAndEnvironmentLabels.md`
+- `docs/features/done/RegistrarRetryAndRecheckHardening.md`
+
+Remaining work is concentrated in:
+
+- phase 3 purchase-prep metadata and dry-run payload generation
+- phase 4 explicit purchase execution
+
 ## Goal
 
 Extend `DomainFindr` beyond RDAP-only availability checks so it can surface registrar pricing and eventually support purchase workflows.
@@ -18,12 +44,21 @@ Key gaps exposed in domain strategy sessions:
 
 ### Phase 1: Read-only registrar pricing
 
-- add registrar provider abstraction
-- support registrar-backed availability checks
-- include `price`, `currency`, and `registration_period` in results
-- add output columns for pricing in table, CSV, and JSON
+Completed.
+
+Implemented via registrar-aware verification, merged registrar result selection, pricing fields in the result model, and provider-aware output formatting.
 
 ### Phase 2: Budget-aware filtering
+
+Completed.
+
+Implemented via:
+
+- `--budget-max`
+- `--budget-min`
+- `--sort price`
+- `--only-standard-price`
+- summary breakdowns for priced available results
 
 - add `--budget-max`
 - add `--budget-min`
@@ -33,12 +68,14 @@ Key gaps exposed in domain strategy sessions:
 
 ### Phase 3: Purchase preparation
 
+- not yet implemented
 - retrieve registrar agreement / consent metadata
 - support dry-run purchase payload generation
 - validate account configuration before purchase mode
 
 ### Phase 4: Purchase execution
 
+- not yet implemented
 - explicit purchase command
 - confirmation step before order placement
 - purchase logs and order receipt capture

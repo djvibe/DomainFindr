@@ -9,6 +9,8 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"sort"
+	"strconv"
 	"strings"
 	"time"
 
@@ -31,6 +33,12 @@ type Config struct {
 	RegistrarRetry     int
 	RegistrarTimeout   time.Duration
 	RegistrarRecheck   int
+	BudgetMin          float64
+	BudgetMax          float64
+	HasBudgetMin       bool
+	HasBudgetMax       bool
+	Sort               string
+	OnlyStandardPrice  bool
 	Verbose            bool
 	Domains            []string
 	LogFile            string
@@ -95,6 +103,7 @@ func Run(ctx context.Context, args []string, stdout io.Writer, stderr io.Writer)
 		fmt.Fprintf(stderr, "%v\n", err)
 		return 1
 	}
+	results = applyResultOptions(results, cfg)
 
 	writer := stdout
 	summaryWriter := stderr
@@ -193,6 +202,10 @@ func parseFlags(args []string, stderr io.Writer) (*Config, error) {
 	fs.IntVar(&cfg.RegistrarRetry, "registrar-retry", 1, "Retries for transient registrar verification failures")
 	fs.DurationVar(&cfg.RegistrarTimeout, "registrar-timeout", 3*time.Second, "Timeout per registrar verification attempt")
 	fs.IntVar(&cfg.RegistrarRecheck, "registrar-recheck", 1, "Additional registrar-only recheck passes for transient registrar_unknown results")
+	fs.Var(&optionalFloat64Value{target: &cfg.BudgetMin, set: &cfg.HasBudgetMin}, "budget-min", "Minimum price filter for priced results")
+	fs.Var(&optionalFloat64Value{target: &cfg.BudgetMax, set: &cfg.HasBudgetMax}, "budget-max", "Maximum price filter for priced results")
+	fs.StringVar(&cfg.Sort, "sort", "", "Sort results by field (supported: price)")
+	fs.BoolVar(&cfg.OnlyStandardPrice, "only-standard-price", false, "Only keep standard-priced available results")
 	fs.BoolVar(&cfg.Verbose, "verbose", false, "Enable verbose logging")
 	fs.BoolVar(&cfg.Verbose, "v", false, "Enable verbose logging")
 	fs.StringVar(&cfg.LogFile, "log-file", "", "Write logs to a file")
@@ -219,6 +232,12 @@ func parseFlags(args []string, stderr io.Writer) (*Config, error) {
 	if cfg.Input == "" && len(cfg.Domains) == 0 {
 		fs.Usage()
 		return nil, fmt.Errorf("provide --input FILE or one or more domains")
+	}
+	if cfg.HasBudgetMin && cfg.HasBudgetMax && cfg.BudgetMin > cfg.BudgetMax {
+		return nil, fmt.Errorf("--budget-min cannot be greater than --budget-max")
+	}
+	if cfg.Sort != "" && cfg.Sort != "price" {
+		return nil, fmt.Errorf("unsupported sort %q", cfg.Sort)
 	}
 
 	return cfg, nil
@@ -386,6 +405,9 @@ func printSummary(w io.Writer, results []model.Result) {
 		disagreements,
 	)
 	for _, line := range providerSummary(results) {
+		fmt.Fprintln(w, line)
+	}
+	for _, line := range priceTierSummary(results) {
 		fmt.Fprintln(w, line)
 	}
 	if len(disagreementDomains) > 0 {
@@ -583,11 +605,70 @@ func providerSummary(results []model.Result) []string {
 			counts[providerSummaryKey(check.Provider, check.Environment)]++
 		}
 	}
-	lines := make([]string, 0, len(counts))
-	for provider, count := range counts {
-		lines = append(lines, fmt.Sprintf("Provider %s returned %d checks.", provider, count))
+	keys := make([]string, 0, len(counts))
+	for provider := range counts {
+		keys = append(keys, provider)
+	}
+	sort.Strings(keys)
+	lines := make([]string, 0, len(keys))
+	for _, provider := range keys {
+		lines = append(lines, fmt.Sprintf("Provider %s returned %d checks.", provider, counts[provider]))
 	}
 	return lines
+}
+
+func priceTierSummary(results []model.Result) []string {
+	counts := map[string]int{}
+	for _, result := range results {
+		label := priceTierLabel(result)
+		if label == "" {
+			continue
+		}
+		counts[label]++
+	}
+	if len(counts) == 0 {
+		return nil
+	}
+	order := []string{
+		"Price tier <$100",
+		"Price tier $100-$499.99",
+		"Price tier $500+",
+		"Price tier unpriced available",
+	}
+	lines := make([]string, 0, len(order))
+	for _, label := range order {
+		if counts[label] == 0 {
+			continue
+		}
+		lines = append(lines, fmt.Sprintf("%s: %d", label, counts[label]))
+	}
+	return lines
+}
+
+func priceTierLabel(result model.Result) string {
+	if !isAvailableStatus(result.Status) {
+		return ""
+	}
+	if result.Price == nil {
+		return "Price tier unpriced available"
+	}
+	switch {
+	case *result.Price < 100:
+		return "Price tier <$100"
+	case *result.Price < 500:
+		return "Price tier $100-$499.99"
+	default:
+		return "Price tier $500+"
+	}
+}
+
+func isAvailableStatus(status string) bool {
+	switch status {
+	case model.StatusAvailable, model.StatusStandardAvailable, model.StatusPremiumAvailable:
+		return true
+	default:
+		return false
+	}
 }
 
 func providerLabel(provider string) string {
@@ -647,4 +728,84 @@ func resolveNamecheapCredentials(cfg *Config) {
 			)
 		}
 	}
+}
+
+func applyResultOptions(results []model.Result, cfg *Config) []model.Result {
+	filtered := make([]model.Result, 0, len(results))
+	for _, result := range results {
+		if cfg.OnlyStandardPrice && !matchesOnlyStandardPrice(result) {
+			continue
+		}
+		if !matchesBudget(result, cfg) {
+			continue
+		}
+		filtered = append(filtered, result)
+	}
+	if cfg.Sort == "price" {
+		sort.SliceStable(filtered, func(i, j int) bool {
+			left := filtered[i]
+			right := filtered[j]
+			switch {
+			case left.Price == nil && right.Price == nil:
+				return left.Domain < right.Domain
+			case left.Price == nil:
+				return false
+			case right.Price == nil:
+				return true
+			case *left.Price != *right.Price:
+				return *left.Price < *right.Price
+			default:
+				return left.Domain < right.Domain
+			}
+		})
+	}
+	return filtered
+}
+
+func matchesOnlyStandardPrice(result model.Result) bool {
+	if result.Price == nil {
+		return false
+	}
+	if result.Status == model.StatusStandardAvailable {
+		return true
+	}
+	return strings.EqualFold(result.PricingClass, "standard")
+}
+
+func matchesBudget(result model.Result, cfg *Config) bool {
+	if !cfg.HasBudgetMin && !cfg.HasBudgetMax {
+		return true
+	}
+	if result.Price == nil {
+		return false
+	}
+	if cfg.HasBudgetMin && *result.Price < cfg.BudgetMin {
+		return false
+	}
+	if cfg.HasBudgetMax && *result.Price > cfg.BudgetMax {
+		return false
+	}
+	return true
+}
+
+type optionalFloat64Value struct {
+	target *float64
+	set    *bool
+}
+
+func (v *optionalFloat64Value) String() string {
+	if v == nil || v.target == nil || v.set == nil || !*v.set {
+		return ""
+	}
+	return strconv.FormatFloat(*v.target, 'f', -1, 64)
+}
+
+func (v *optionalFloat64Value) Set(raw string) error {
+	value, err := strconv.ParseFloat(strings.TrimSpace(raw), 64)
+	if err != nil {
+		return err
+	}
+	*v.target = value
+	*v.set = true
+	return nil
 }

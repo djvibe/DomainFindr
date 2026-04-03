@@ -7,6 +7,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/djvibe/domainfindr/internal/model"
 )
 
 func TestParseFlagsAcceptsPositionalDomains(t *testing.T) {
@@ -255,6 +257,118 @@ func TestProviderSummaryKeyIncludesEnvironmentForRegistrars(t *testing.T) {
 	}
 	if got := providerSummaryKey("rdap", "registry"); got != "RDAP" {
 		t.Fatalf("unexpected rdap provider summary key: %q", got)
+	}
+}
+
+func TestParseFlagsAcceptsBudgetAndSortOptions(t *testing.T) {
+	t.Parallel()
+
+	stderr := &bytes.Buffer{}
+	cfg, err := parseFlags([]string{
+		"--budget-min", "10",
+		"--budget-max", "100",
+		"--sort", "price",
+		"--only-standard-price",
+		"example.com",
+	}, stderr)
+	if err != nil {
+		t.Fatalf("parseFlags() error = %v", err)
+	}
+	if !cfg.HasBudgetMin || cfg.BudgetMin != 10 {
+		t.Fatalf("unexpected budget min: %#v", cfg)
+	}
+	if !cfg.HasBudgetMax || cfg.BudgetMax != 100 {
+		t.Fatalf("unexpected budget max: %#v", cfg)
+	}
+	if cfg.Sort != "price" {
+		t.Fatalf("unexpected sort: %#v", cfg)
+	}
+	if !cfg.OnlyStandardPrice {
+		t.Fatalf("expected only-standard-price enabled: %#v", cfg)
+	}
+}
+
+func TestParseFlagsRejectsInvalidBudgetRange(t *testing.T) {
+	t.Parallel()
+
+	stderr := &bytes.Buffer{}
+	_, err := parseFlags([]string{
+		"--budget-min", "100",
+		"--budget-max", "10",
+		"example.com",
+	}, stderr)
+	if err == nil {
+		t.Fatal("expected error")
+	}
+	if !strings.Contains(err.Error(), "--budget-min cannot be greater than --budget-max") {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestParseFlagsRejectsUnsupportedSort(t *testing.T) {
+	t.Parallel()
+
+	stderr := &bytes.Buffer{}
+	_, err := parseFlags([]string{"--sort", "domain", "example.com"}, stderr)
+	if err == nil {
+		t.Fatal("expected error")
+	}
+	if !strings.Contains(err.Error(), `unsupported sort "domain"`) {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestApplyResultOptionsFiltersAndSortsByPrice(t *testing.T) {
+	t.Parallel()
+
+	results := []model.Result{
+		{Domain: "premium.com", Status: model.StatusPremiumAvailable, PricingClass: "premium", Price: model.Float64Ptr(999), Available: model.BoolPtr(true)},
+		{Domain: "standard-mid.com", Status: model.StatusStandardAvailable, PricingClass: "standard", Price: model.Float64Ptr(20), Available: model.BoolPtr(true)},
+		{Domain: "standard-low.com", Status: model.StatusStandardAvailable, PricingClass: "standard", Price: model.Float64Ptr(12), Available: model.BoolPtr(true)},
+		{Domain: "unknown-price.com", Status: model.StatusStandardAvailable, PricingClass: "standard", Available: model.BoolPtr(true)},
+	}
+
+	cfg := &Config{
+		HasBudgetMin:      true,
+		BudgetMin:         10,
+		HasBudgetMax:      true,
+		BudgetMax:         25,
+		Sort:              "price",
+		OnlyStandardPrice: true,
+	}
+
+	filtered := applyResultOptions(results, cfg)
+	if len(filtered) != 2 {
+		t.Fatalf("expected 2 results, got %#v", filtered)
+	}
+	if filtered[0].Domain != "standard-low.com" || filtered[1].Domain != "standard-mid.com" {
+		t.Fatalf("unexpected result order: %#v", filtered)
+	}
+}
+
+func TestPriceTierSummary(t *testing.T) {
+	t.Parallel()
+
+	lines := priceTierSummary([]model.Result{
+		{Domain: "low.com", Status: model.StatusStandardAvailable, Price: model.Float64Ptr(12), Available: model.BoolPtr(true)},
+		{Domain: "mid.com", Status: model.StatusPremiumAvailable, Price: model.Float64Ptr(250), Available: model.BoolPtr(true)},
+		{Domain: "high.com", Status: model.StatusPremiumAvailable, Price: model.Float64Ptr(1200), Available: model.BoolPtr(true)},
+		{Domain: "unknown.com", Status: model.StatusAvailable, Available: model.BoolPtr(true)},
+		{Domain: "taken.com", Status: model.StatusUnavailable, Price: model.Float64Ptr(15), Available: model.BoolPtr(false)},
+	})
+
+	output := strings.Join(lines, "\n")
+	if !strings.Contains(output, "Price tier <$100: 1") {
+		t.Fatalf("missing low tier summary: %v", lines)
+	}
+	if !strings.Contains(output, "Price tier $100-$499.99: 1") {
+		t.Fatalf("missing mid tier summary: %v", lines)
+	}
+	if !strings.Contains(output, "Price tier $500+: 1") {
+		t.Fatalf("missing high tier summary: %v", lines)
+	}
+	if !strings.Contains(output, "Price tier unpriced available: 1") {
+		t.Fatalf("missing unpriced tier summary: %v", lines)
 	}
 }
 
