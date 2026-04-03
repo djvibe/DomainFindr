@@ -14,7 +14,7 @@ The highest-value user outcome is not a raw available/taken list. It is a decisi
 - pricing reality
 - purchase guidance
 
-## Proposed Capabilities
+## Follow-Up Capabilities
 
 ### Idea generation
 
@@ -53,15 +53,34 @@ The highest-value user outcome is not a raw available/taken list. It is a decisi
 - include buy-now recommendation
 - include skip list and rationale
 
-## Suggested CLI / Workflow Direction
+## Current CLI / Workflow
 
-This may start as a doc-driven workflow before becoming a full command.
+This started as a doc-driven workflow and now has an initial command shape.
 
-Possible future command:
+Current v1 command:
 
 ```bash
-domainFindr consult --brief brief.md --style authority,startup --provider godaddy
+domainFindr consult --brief brief.md --style authority,startup --provider godaddy --input candidates.md
 ```
+
+Current v1 behavior:
+
+- parses a structured brief from Markdown
+- creates a session folder under `workspace/results/`
+- writes:
+  - `README.md`
+  - `executive-summary.md`
+  - `full-report.md`
+  - `candidate-domains.md`
+  - `availability.md`
+- optionally runs the existing availability pipeline when candidate domains are supplied
+
+Still missing for a fuller consultant mode:
+
+- idea generation from raw prompts
+- recommendation scoring by naming quality
+- richer decision logic for startup vs directory vs authority lanes
+- direct purchase workflow integration
 
 ## Success Criteria
 

@@ -100,12 +100,23 @@ Final artifacts should include:
 - keep local research in `workspace/`
 - store durable lessons in tracked docs
 
+## Current V1 Support
+
+The initial `domainFindr consult` workflow now supports:
+
+- brief-driven session setup via `--brief`
+- naming lane selection via `--style`
+- local session artifact creation under `workspace/results/`
+- optional availability sweep when candidate domains are provided via `--input` or positional domains
+
+This means the repo now supports workflow scaffolding and session output generation, but not full automated naming ideation or scoring yet.
+
 ## Recommended Output Structure
 
 Tracked:
 
 - `docs/domain_research_lessons.md`
-- `docs/features/planned/`
+- `docs/features/done/`
 
 Local:
 
