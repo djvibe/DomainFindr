@@ -112,6 +112,47 @@ func TestParseFlagsAcceptsRegistrarVerificationConfig(t *testing.T) {
 	}
 }
 
+func TestParseConsultFlagsRequiresBrief(t *testing.T) {
+	t.Parallel()
+
+	stderr := &bytes.Buffer{}
+	_, err := parseConsultFlags(nil, stderr)
+	if err == nil {
+		t.Fatal("expected error")
+	}
+	if !strings.Contains(err.Error(), "provide --brief FILE") {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestParseConsultFlagsAcceptsStylesAndDomains(t *testing.T) {
+	t.Parallel()
+
+	stderr := &bytes.Buffer{}
+	cfg, err := parseConsultFlags([]string{
+		"--brief", "brief.md",
+		"--style", "authority,startup,authority",
+		"--provider", "godaddy,namecheap",
+		"spaatlas.ai",
+	}, stderr)
+	if err != nil {
+		t.Fatalf("parseConsultFlags() error = %v", err)
+	}
+
+	if cfg.Brief != "brief.md" {
+		t.Fatalf("unexpected brief: %#v", cfg)
+	}
+	if len(cfg.Styles) != 2 || cfg.Styles[0] != "authority" || cfg.Styles[1] != "startup" {
+		t.Fatalf("unexpected styles: %#v", cfg.Styles)
+	}
+	if len(cfg.RegistrarProviders) != 2 {
+		t.Fatalf("unexpected providers: %#v", cfg.RegistrarProviders)
+	}
+	if len(cfg.Domains) != 1 || cfg.Domains[0] != "spaatlas.ai" {
+		t.Fatalf("unexpected domains: %#v", cfg.Domains)
+	}
+}
+
 func TestParseFlagsDefaultsToGoDaddyWhenCredentialsPresent(t *testing.T) {
 	t.Setenv("GODADDY_API_KEY", "key")
 	t.Setenv("GODADDY_API_SECRET", "secret")

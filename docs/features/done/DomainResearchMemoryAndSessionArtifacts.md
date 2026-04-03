@@ -16,7 +16,7 @@ High-value naming sessions generate:
 
 Without a durable structure, the same work gets repeated.
 
-## Proposed Scope
+## Current V1 Scope
 
 ### Tracked memory
 
@@ -31,12 +31,23 @@ Without a durable structure, the same work gets repeated.
   - `README.md`
   - `executive-summary.md`
   - `full-report.md`
+  - `candidate-domains.md`
+  - `availability.md`
 
 ### Output conventions
 
 - name folders with topic + date
 - keep titles human-readable and recallable
 - separate durable lessons from one-off research output
+
+## Current Status
+
+The initial `domainFindr consult` workflow now creates these local session artifacts automatically.
+
+Still open:
+
+- deciding whether to add a tracked session recap artifact in `docs/`
+- tightening the brief schema beyond simple Markdown field parsing
 
 ## Success Criteria
 

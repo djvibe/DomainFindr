@@ -1,5 +1,7 @@
 # Executive Summary
 
+Historical note: this document describes the original implementation plan before registrar verification and consultant-mode session artifacts were added. The current codebase has moved beyond the purely initial availability-checker scope described below.
+
 We want a CLI tool that reads a list of domain names (from a Markdown file or a CSV) and checks each domain’s availability (registered or free). It should output the results (domain name and availability status) as CSV, JSON, or a human-readable table. Key requirements include parsing input files, performing lookups (via WHOIS or DNS), handling concurrency and rate limits, and formatting output. Non-functional needs cover error handling, logging, retries, and cross-platform support.
 
 The core workflow is: read domains, for each domain perform a WHOIS/DNS query (or use an API), then collect and format the results. Because many registries enforce strict rate limits (≈1 lookup per second per IP), our tool must throttle requests accordingly. We’ll use a worker pool (threads or async tasks) with a delay or token bucket to avoid overwhelming WHOIS servers. For example, the Rust tool “domain-check” processes up to 100 domains in parallel with retries and outputs CSV/JSON – we’ll adopt a simpler version of that idea. 

@@ -2,10 +2,11 @@
 
 ## Project Structure & Module Organization
 
-This repository contains a Go CLI for domain availability checks.
+This repository contains a Go CLI for domain availability checks and domain-consultant session workflows.
 
 - `cmd/domainfindr/`: executable entrypoint.
 - `internal/app/`: CLI argument parsing and top-level orchestration.
+- `internal/consult/`: brief parsing and consultant session artifact generation.
 - `internal/input/`: Markdown and CSV parsing.
 - `internal/lookup/`: RDAP lookup client and lookup-specific tests.
 - `internal/runner/`: worker pool, retry logic, and rate limiting.
@@ -17,7 +18,7 @@ This repository contains a Go CLI for domain availability checks.
 
 Keep new production code under `internal/` unless it is the binary entrypoint.
 
-Before starting new domain-strategy or naming workflow changes, review `docs/domain_research_lessons.md` for session-to-session context.
+Before starting new domain-strategy or naming workflow changes, review `docs/domain_research_lessons.md` for session-to-session context and keep consultant artifacts aligned with the `workspace/results/` conventions.
 
 ## Build, Test, and Development Commands
 
@@ -27,6 +28,7 @@ Use the Go toolchain installed at `/usr/local/go/bin`, or ensure it is on `PATH`
 - `gofmt -w cmd internal`: format all Go source files.
 - `go build -o domainFindr ./cmd/domainfindr`: build the local binary.
 - `go run ./cmd/domainfindr openai.com`: run the CLI without building first.
+- `go run ./cmd/domainfindr consult --brief brief.md --input candidates.md`: create a consultant session with optional availability sweep.
 
 If sandboxed environments block the default build cache, use:
 `GOCACHE=/tmp/domainfindr-go-build-cache go test ./...`
@@ -52,6 +54,7 @@ Tests use Go’s built-in `testing` package and live next to the code as `*_test
 - Mock HTTP behavior in lookup tests rather than relying on external RDAP services.
 - When explicitly validating live registrar integrations, use escalated execution as needed instead of treating sandbox network failures as product failures.
 - Run `go test ./...` before opening a PR.
+- When changing consultant mode, verify the generated artifact set and folder naming remain consistent with `workspace/results/<session>-<date>/`.
 
 ## Commit & Pull Request Guidelines
 
@@ -67,4 +70,4 @@ For pull requests:
 
 ## Security & Configuration Tips
 
-Do not hardcode API keys or credentials. v1 uses public RDAP lookups only. If future work adds provider APIs, load credentials from environment variables and document them in `docs/` instead of committing secrets.
+Do not hardcode API keys or credentials. Registrar verification already uses environment-driven credentials where needed. Keep future provider or purchase credentials in environment variables and document them in `docs/` instead of committing secrets.
