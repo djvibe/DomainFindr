@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 )
 
 func TestParseFlagsAcceptsPositionalDomains(t *testing.T) {
@@ -88,7 +89,14 @@ func TestParseFlagsAcceptsRegistrarVerificationConfig(t *testing.T) {
 	t.Parallel()
 
 	stderr := &bytes.Buffer{}
-	cfg, err := parseFlags([]string{"--registrar-base-url", "https://registrar.test", "--registrar-provider", "test_registrar", "example.com"}, stderr)
+	cfg, err := parseFlags([]string{
+		"--registrar-base-url", "https://registrar.test",
+		"--registrar-provider", "test_registrar",
+		"--registrar-retry", "3",
+		"--registrar-timeout", "4s",
+		"--registrar-recheck", "2",
+		"example.com",
+	}, stderr)
 	if err != nil {
 		t.Fatalf("parseFlags() error = %v", err)
 	}
@@ -98,6 +106,9 @@ func TestParseFlagsAcceptsRegistrarVerificationConfig(t *testing.T) {
 	}
 	if cfg.RegistrarProvider != "test_registrar" {
 		t.Fatalf("unexpected registrar provider: %#v", cfg)
+	}
+	if cfg.RegistrarRetry != 3 || cfg.RegistrarTimeout != 4*time.Second || cfg.RegistrarRecheck != 2 {
+		t.Fatalf("unexpected registrar hardening config: %#v", cfg)
 	}
 }
 

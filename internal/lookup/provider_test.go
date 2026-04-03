@@ -10,10 +10,40 @@ import (
 
 type stubProvider struct {
 	result model.Result
+	kind   ProviderKind
 }
 
 func (s stubProvider) Check(context.Context, string) model.Result {
 	return s.result
+}
+
+func (s stubProvider) Kind() ProviderKind {
+	if s.kind == "" {
+		if s.result.Source == model.SourceRDAP {
+			return ProviderKindRDAP
+		}
+		return ProviderKindRegistrar
+	}
+	return s.kind
+}
+
+type sequenceProvider struct {
+	results []model.Result
+	kind    ProviderKind
+	calls   int
+}
+
+func (s *sequenceProvider) Check(context.Context, string) model.Result {
+	result := s.results[s.calls]
+	s.calls++
+	return result
+}
+
+func (s *sequenceProvider) Kind() ProviderKind {
+	if s.kind == "" {
+		return ProviderKindRegistrar
+	}
+	return s.kind
 }
 
 func TestVerifierFallsBackToRDAPWhenNoRegistrarProvider(t *testing.T) {
@@ -329,5 +359,72 @@ func TestVerifierPrefersProductionRegistrarOverSandboxResult(t *testing.T) {
 
 	if result.VerificationProvider != "namecheap" || result.VerificationEnv != EnvironmentProduction {
 		t.Fatalf("expected production registrar to win, got %#v", result)
+	}
+}
+
+func TestVerifierRetriesTransientRegistrarTimeouts(t *testing.T) {
+	t.Parallel()
+
+	registrar := &sequenceProvider{
+		results: []model.Result{
+			registrarUnknown("example.com", "godaddy", context.DeadlineExceeded),
+			{
+				Domain:               "example.com",
+				Available:            model.BoolPtr(true),
+				Status:               model.StatusStandardAvailable,
+				Source:               model.SourceHTTP,
+				PricingClass:         "standard",
+				Price:                model.Float64Ptr(12.99),
+				Currency:             "USD",
+				RegistrationPeriod:   model.IntPtr(1),
+				VerificationProvider: "godaddy",
+				VerificationEnv:      EnvironmentProduction,
+			},
+		},
+	}
+
+	verifier := NewVerifierWithConfig(VerifierConfig{RegistrarRetry: 1}, registrar)
+	result := verifier.Check(context.Background(), "example.com")
+
+	if registrar.calls != 2 {
+		t.Fatalf("expected registrar retry, got %d calls", registrar.calls)
+	}
+	if result.Status != model.StatusStandardAvailable {
+		t.Fatalf("expected retry to recover registrar result, got %#v", result)
+	}
+}
+
+func TestVerifierRechecksTransientRegistrarUnknownResults(t *testing.T) {
+	t.Parallel()
+
+	registrar := &sequenceProvider{
+		results: []model.Result{
+			registrarUnknown("example.com", "godaddy", context.DeadlineExceeded),
+			registrarUnknown("example.com", "godaddy", context.DeadlineExceeded),
+			{
+				Domain:               "example.com",
+				Available:            model.BoolPtr(false),
+				Status:               model.StatusUnavailable,
+				Source:               model.SourceHTTP,
+				VerificationProvider: "godaddy",
+				VerificationEnv:      EnvironmentProduction,
+			},
+		},
+	}
+
+	verifier := NewVerifierWithConfig(VerifierConfig{
+		RegistrarRetry:   1,
+		RegistrarRecheck: 1,
+	}, registrar)
+	result := verifier.Check(context.Background(), "example.com")
+
+	if registrar.calls != 3 {
+		t.Fatalf("expected retry plus bounded recheck, got %d calls", registrar.calls)
+	}
+	if result.Status != model.StatusUnavailable {
+		t.Fatalf("expected recheck result to replace registrar_unknown, got %#v", result)
+	}
+	if len(result.Verifications) != 1 {
+		t.Fatalf("expected a single provider verification entry, got %#v", result.Verifications)
 	}
 }

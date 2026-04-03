@@ -26,9 +26,15 @@ Completed.
 
 ### 3. Registrar retry and timeout hardening
 
-- improve retry behavior for registrar timeouts
-- separate RDAP retry policy from registrar retry policy
-- consider fallback recheck mode for high-interest domains
+Completed.
+
+Implemented:
+
+- separate verifier-level registrar retry policy
+- transient timeout and transient HTTP failure classification for registrar errors
+- bounded registrar-only recheck path for transient `registrar_unknown` results
+
+See `docs/features/done/RegistrarRetryAndRecheckHardening.md` for implementation notes.
 
 ### 4. Provider ranking / confidence
 

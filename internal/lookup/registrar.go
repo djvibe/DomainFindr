@@ -17,6 +17,10 @@ type RegistrarHTTPProvider struct {
 	Client  *http.Client
 }
 
+func (p *RegistrarHTTPProvider) Kind() ProviderKind {
+	return ProviderKindRegistrar
+}
+
 func NewRegistrarHTTPProvider(name string, client *http.Client, baseURL string) *RegistrarHTTPProvider {
 	if client == nil {
 		client = http.DefaultClient
@@ -53,6 +57,9 @@ func (p *RegistrarHTTPProvider) Check(ctx context.Context, domain string) model.
 
 	if resp.StatusCode != http.StatusOK {
 		result := registrarUnknown(domain, p.Name, fmt.Errorf("registrar lookup failed: %s", resp.Status))
+		if isTransientRegistrarHTTPStatus(resp.StatusCode) {
+			result = markRegistrarFailure(result, true, resp.StatusCode == http.StatusRequestTimeout || resp.StatusCode == http.StatusGatewayTimeout)
+		}
 		result.VerificationEnv = environment
 		return result
 	}
@@ -111,11 +118,14 @@ func normalizeRegistrarStatus(status string, available *bool, pricingClass strin
 }
 
 func registrarUnknown(domain string, provider string, err error) model.Result {
+	transient, timedOut := classifyRegistrarError(err)
 	return model.Result{
 		Domain:               domain,
 		Status:               model.StatusRegistrarUnknown,
 		Source:               model.SourceHTTP,
 		VerificationProvider: provider,
 		Error:                model.StringPtr(err.Error()),
+		Transient:            transient,
+		TimedOut:             timedOut,
 	}
 }

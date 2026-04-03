@@ -125,3 +125,24 @@ func TestGoDaddyProviderUnknownWhenNotDefinitive(t *testing.T) {
 		t.Fatalf("unexpected result: %#v", result)
 	}
 }
+
+func TestGoDaddyProviderMarksTransientHTTPFailures(t *testing.T) {
+	t.Parallel()
+
+	client := &http.Client{
+		Transport: roundTripFunc(func(req *http.Request) (*http.Response, error) {
+			return &http.Response{
+				StatusCode: http.StatusServiceUnavailable,
+				Body:       io.NopCloser(strings.NewReader(`{"code":"SERVICE_UNAVAILABLE","message":"try again later"}`)),
+				Header:     make(http.Header),
+			}, nil
+		}),
+	}
+
+	provider := NewGoDaddyProvider("key", "secret", client, "https://api.godaddy.test")
+	result := provider.Check(context.Background(), "maybe.com")
+
+	if result.Status != model.StatusRegistrarUnknown || !result.Transient {
+		t.Fatalf("expected transient registrar_unknown, got %#v", result)
+	}
+}

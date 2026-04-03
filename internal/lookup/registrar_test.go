@@ -2,6 +2,7 @@ package lookup
 
 import (
 	"context"
+	"errors"
 	"io"
 	"net/http"
 	"strings"
@@ -85,5 +86,19 @@ func TestRegistrarHTTPProviderBadResponseReturnsUnknown(t *testing.T) {
 
 	if result.Status != model.StatusRegistrarUnknown || result.Error == nil {
 		t.Fatalf("unexpected result: %#v", result)
+	}
+}
+
+func TestRegistrarUnknownClassifiesTimeoutAsTransient(t *testing.T) {
+	t.Parallel()
+
+	result := registrarUnknown("example.com", "test_registrar", context.DeadlineExceeded)
+	if !result.Transient || !result.TimedOut {
+		t.Fatalf("expected timeout classification, got %#v", result)
+	}
+
+	nonTransient := registrarUnknown("example.com", "test_registrar", errors.New("authentication failed"))
+	if nonTransient.Transient || nonTransient.TimedOut {
+		t.Fatalf("expected non-transient classification, got %#v", nonTransient)
 	}
 }
