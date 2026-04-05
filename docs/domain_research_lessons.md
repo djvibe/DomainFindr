@@ -102,6 +102,16 @@ Avoid overwhelming users with low-signal fringe TLDs.
 
 ## Workflow Lessons
 
+### Use `main` as the default branch
+
+Unless there is an explicit request to isolate work on another branch, do the work on `main` and push `main`.
+
+Implications:
+
+- treat `main` as the default integration path
+- only use feature branches when there is a clear reason
+- if work lands on a side branch by accident, move it back to `main` before closing the task
+
 ### Batch file format matters
 
 Markdown input must be constrained to domain-bearing structures only.

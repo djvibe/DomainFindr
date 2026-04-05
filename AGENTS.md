@@ -20,6 +20,12 @@ Keep new production code under `internal/` unless it is the binary entrypoint.
 
 Before starting new domain-strategy or naming workflow changes, review `docs/domain_research_lessons.md` for session-to-session context and keep consultant artifacts aligned with the `workspace/results/` conventions.
 
+Default branch policy:
+
+- use `main` as the default working and integration branch
+- only create or use feature branches when explicitly requested
+- if work starts on a side branch by mistake, move the commits back to `main` before considering the task complete
+
 ## Build, Test, and Development Commands
 
 Use the Go toolchain installed at `/usr/local/go/bin`, or ensure it is on `PATH`.

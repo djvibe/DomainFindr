@@ -9,6 +9,7 @@ DomainFindr is a Go CLI for domain availability checks and domain-strategy workf
 - Consultant session workflow: `domainFindr consult --brief brief.md --input candidates.md`
 - Output formats: table, JSON, and CSV
 - RDAP-based screening with optional registrar verification
+- Budget-aware filtering and price sorting for registrar-priced results
 - Worker pool with retries, timeouts, and global request pacing
 - Automatic per-run history with saved results and logs
 - Consultant session artifacts under `workspace/results/`
@@ -44,6 +45,8 @@ The `consult` workflow:
 - creates a session folder under `workspace/results/`
 - writes `README.md`, `executive-summary.md`, `full-report.md`, `candidate-domains.md`, and `availability.md`
 - optionally runs the existing availability pipeline when an input file or positional domains are supplied
+
+For live RDAP or registrar verification in restricted environments, prefer running outside the sandbox so network access and default history/state paths do not distort the result set.
 
 ## Usage
 
@@ -93,6 +96,7 @@ Examples:
 domainFindr openai.com
 domainFindr --input ~/Downloads/domains.csv --history-dir ~/domainfindr-history
 domainFindr --input ~/Downloads/domains.md --log-file ~/domainfindr.log --no-history
+domainFindr --provider godaddy --budget-max 100 --sort price --only-standard-price spaatlas.ai sparank.ai
 ```
 
 ### Common flags
@@ -100,6 +104,10 @@ domainFindr --input ~/Downloads/domains.md --log-file ~/domainfindr.log --no-his
 - `--input`, `-i`: Markdown or CSV input file
 - `--output`, `-o`: write results to a file instead of stdout
 - `--format`, `-f`: `table`, `json`, or `csv`
+- `--budget-min`: only keep priced results at or above this amount
+- `--budget-max`: only keep priced results at or below this amount
+- `--sort price`: sort results by ascending price, with unpriced results last
+- `--only-standard-price`: only keep standard-priced available results
 - `--concurrency`, `-c`: number of workers
 - `--delay`: minimum delay between outbound lookups
 - `--retry`: retry count for transient failures
@@ -134,6 +142,11 @@ domainFindr --input ~/Downloads/domains.md --log-file ~/domainfindr.log --no-his
 ## Suggested Workflow
 
 Use `workspace/` for local batch processing and consultant session outputs, and `docs/features/` for tracked feature planning and completed launch docs.
+
+Branch policy:
+
+- use `main` by default for day-to-day work
+- only use feature branches when you explicitly want isolated branch work
 
 ### Batch searches
 
